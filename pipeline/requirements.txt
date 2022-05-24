@@ -1,0 +1,8 @@
+matplotlib==3.5.1
+numpy==1.22.3
+open3d==0.15.1
+opencv_python==4.5.5.64
+Pillow==9.1.0
+pydicom==2.3.0
+scipy==1.8.0
+tqdm==4.64.0
