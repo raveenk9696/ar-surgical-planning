@@ -38,4 +38,4 @@ if __name__ == '__main__':
     #with open(path, "w") as f:
         # write header
         #f.write(PLY_HEADER)
-    o3d.io.write_point_cloud("downsampled.ply", pcd, write_ascii=True)
+    o3d.io.write_point_cloud("downsampled.ply", downsampled_pcd, write_ascii=True)
