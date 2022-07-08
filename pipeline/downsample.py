@@ -33,6 +33,8 @@ if __name__ == '__main__':
     downsampled_pcd = pcd.random_down_sample(ratio)
 
     print("New point cloud has " + str(len(np.asarray(downsampled_pcd.points))) + " points.")
+    o3d.visualization.draw_geometries([downsampled_pcd])
+
     print("Saving new point cloud as downsampled")
 
     #with open(path, "w") as f:
