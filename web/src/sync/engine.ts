@@ -250,7 +250,9 @@ export function createEngine(o: {
       return;
     }
     const from = senderOf(msg);
-    if (from === self.id || !all.take('all')) return;
+    if (from === self.id) return;
+    if (!perLink[msg.k === 'bye' ? 'hello' : msg.k].take(link)) return;
+    if (!all.take('all')) return;
     const signed = msg.k === 'note' || msg.k === 'snapshot';
     const bound = identities.get(from);
     // Presence is unsigned. Link binding limits spoofing of pointers, which cannot change notes.
@@ -264,7 +266,6 @@ export function createEngine(o: {
       }
     }
     if (!signed && link !== 'tab' && linkPeers.has(link) && linkPeers.get(link) !== from) return;
-    if (msg.k !== 'bye' && !perLink[msg.k].take(link)) return;
     if (!signed) {
       identities.set(from, { link, seenAt: now() });
       if (link !== 'tab') linkPeers.set(link, from);

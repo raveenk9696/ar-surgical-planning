@@ -224,7 +224,7 @@ describe('engine on a fake network', () => {
     for (let i = 1; i <= 300; i++) a.end.inject({ v: 2, k: 'bye', from: `${peer('C').id}` });
     a.end.inject({ v: 2, k: 'note', from: `${peer('B').id}`, note: noteBy('B', 99) });
     await settle();
-    expect(a.engine.state.notes.has(`${peer('B').id}.99`)).toBe(false);
+    expect(a.engine.state.notes.has(`${peer('B').id}.99`)).toBe(true);
   });
 
   it('enforces the per-author, live and record caps locally', async () => {
@@ -662,4 +662,18 @@ it('evicts deletions before live notes in every arrival order', () => {
   const honest = noteBy('A', 1);
   expect(mergeNotes(new Map(), [...tombs, honest]).has(honest.id)).toBe(true);
   expect(mergeNotes(new Map(), [...tombs, honest])).toEqual(mergeNotes(new Map(), [honest, ...tombs.reverse()]));
+});
+
+it('delivers honest notes and presence during a 300-message-per-second link flood', async () => {
+  const a = mk(new FakeHub(), 'A');
+  await a.engine.start();
+  for (let t = 0; t < 1000; t++) {
+    for (let i = 0; i < 3; i++) a.end.inject({ v: 2, k: 'bye', from: peer('M').id }, 'nostr:m');
+    if (t % 7 === 0) a.end.inject({ v: 2, k: 'presence', from: peer('V'), seq: t + 1, ptr: [1, 2, 3], away: false, digest: digestOf([]) }, 'nostr:v');
+    if (t % 100 === 99) a.end.inject({ v: 2, k: 'note', from: peer('V').id, note: noteBy('V', t + 1) }, 'nostr:v');
+    vi.advanceTimersByTime(10);
+  }
+  await settle();
+  expect(a.engine.state.notes.size).toBe(10);
+  expect(a.engine.state.peers.get(peer('V').id)?.seq).toBe(995);
 });

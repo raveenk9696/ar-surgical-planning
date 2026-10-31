@@ -11,7 +11,7 @@ export const LIMITS = {
   heartbeatMs: 2000,
   peerTtlMs: 8000,
   noteBucket: { burst: 5, refillMs: 1000 },
-  inboundPerSec: 200,
+  inboundPerSec: 2000,
   snapshotMinGapMs: 2000,
   cacheTtlMs: 86_400_000,
 } as const;
