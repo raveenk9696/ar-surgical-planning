@@ -33,10 +33,16 @@ The git history keeps each commit's original author and date.
 |---|---|
 | raveenk9696 (Raveen Kariyawasam) | Committed the pipeline (May 2022), `viewer/`, and `pipeline-lite/` (October 2022). |
 | solimaga | `downsample.py`, `outlierRemoval.py`, and `color_visualize.py` (June to August 2022). |
-| albid852 | `DcmSequence.py`, `preprocessing.py`, `PlotDCM.py`, and the img2ply port in `generator.py`. These files first appear in albid852's DicomSequence repository (2021). |
+| albid852 | `DcmSequence.py`, `preprocessing.py`, and `PlotDCM.py` come from albid852's DicomSequence repository (2021), with changes. `generator.py` comes from albid852's Python 3 port of img2ply in the same repository, with changes. |
 | albert239825 | The HoloLens Unity app, in its own repository. |
+| Robert Joosten | [img2ply](https://github.com/robertjoosten/img2ply) (2017, GPL-3.0), the base of `generator.py`. |
 
 TODO(Raveen): confirm each person's real name and that they agree to be named.
+
+## Publications
+
+- R. S. Kariyawasam, M. K. Song, P. Kodali, A. Chen, A. Domi, J. Cai, E. Almoamen, and C. Rajapakse. "Automated medical image based anatomical point cloud generation for collaborative real-time augmented reality applications." Proc. SPIE 12037, Medical Imaging 2022: Imaging Informatics for Healthcare, Research, and Applications, 120370R (2022). [doi:10.1117/12.2612993](https://doi.org/10.1117/12.2612993)
+- R. S. Kariyawasam, J. E. Somani, O. Sorci, H. Nagayumi, C. E. Witmer, B. J. Park, and C. S. Rajapakse. "Automated medical image based anatomical 3D model generation for augmented reality applications." Poster 11315-78, SPIE Medical Imaging 2020, Houston.
 
 ## Patient data
 

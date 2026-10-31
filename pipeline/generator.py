@@ -1,3 +1,7 @@
+# Adapted from img2ply by Robert Joosten (2017), https://github.com/robertjoosten/img2ply,
+# which is licensed under the GNU General Public License v3.0. albid852 ported it to
+# Python 3 in 2021, and it was changed for this pipeline in 2022 and 2026 (see git log).
+# This file is distributed under the GNU General Public License v3.0.
 """
 To-Do:
     optimize this entire thing to use numpy instead
