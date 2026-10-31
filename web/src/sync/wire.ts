@@ -95,7 +95,7 @@ export function decode(raw: unknown): Wire | null {
       if (!exact(raw, ['v', 'k', 'from', 'note'])) return null;
       const from = peerId(raw.from);
       const n = note(raw.note);
-      return from && n ? { v: 1, k: 'note', from, note: n } : null;
+      return from && n && n.author.id === from ? { v: 1, k: 'note', from, note: n } : null;
     }
     case 'snapshot': {
       if (!exact(raw, ['v', 'k', 'from', 'notes'])) return null;

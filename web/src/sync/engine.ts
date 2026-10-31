@@ -299,7 +299,7 @@ export function createEngine(o: {
     },
     deleteNote(id) {
       const n = state.notes.get(id);
-      if (n && !n.deleted) localNote({ ...n, deleted: true, text: '' });
+      if (n && n.author.id === self.id && !n.deleted) localNote({ ...n, deleted: true, text: '' });
     },
     setPointer(p) {
       if (p === ptr || (p && ptr && p[0] === ptr[0] && p[1] === ptr[1] && p[2] === ptr[2])) return;

@@ -9,28 +9,10 @@ export function fnv32(s: string): number {
   return h >>> 0;
 }
 
-/** The fields no peer may change. Their JSON text orders two conflicting records the same way on every peer. */
-function immutableKey(n: Note): string {
-  return JSON.stringify([n.pos, n.nrm, n.mesh, n.author.id, n.author.name, n.created]);
-}
-
-/**
- * Join of two records with the same id. Commutative, associative and idempotent:
- * the smaller immutable key wins; within one key, `deleted` is an OR and live text is the smaller string.
- */
 export function mergeNote(a: Note | undefined, b: Note): { note: Note; changed: boolean } {
   if (!a) return { note: b.deleted && b.text ? { ...b, text: '' } : b, changed: true };
-  const ka = immutableKey(a);
-  const kb = immutableKey(b);
-  let next: Note;
-  if (ka !== kb) {
-    next = ka < kb ? a : b;
-  } else {
-    const deleted = a.deleted || b.deleted;
-    next = { ...a, deleted, text: deleted ? '' : a.text <= b.text ? a.text : b.text };
-  }
-  const changed = next.deleted !== a.deleted || next.text !== a.text || immutableKey(next) !== ka;
-  return changed ? { note: next, changed } : { note: a, changed };
+  if (!a.deleted && b.deleted) return { note: { ...a, deleted: true, text: '' }, changed: true };
+  return { note: a, changed: false };
 }
 
 export function digestOf(notes: Iterable<Note>): Digest {

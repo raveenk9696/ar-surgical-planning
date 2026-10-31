@@ -29,8 +29,8 @@ const fold = (notes: Note[]): Map<string, Note> => {
   return m;
 };
 
-const sameId = fc.constantFrom('AAAAAAAA.1', 'BBBBBBBB.2').chain((id) =>
-  fc.tuple(noteArb, noteArb, noteArb).map((t) => t.map((n) => ({ ...n, id, author: AUTHORS.find((a) => id.startsWith(a.id)) ?? n.author })) as [Note, Note, Note]),
+const sameId = fc.tuple(noteArb, fc.boolean(), fc.boolean(), fc.boolean()).map(([base, ...flags]) =>
+  flags.map((deleted) => ({ ...base, deleted, text: deleted ? '' : 'hip' })) as [Note, Note, Note],
 );
 
 describe('mergeNote', () => {
@@ -65,7 +65,7 @@ describe('mergeNote', () => {
   it('converges whatever order records arrive in', () => {
     fc.assert(
       fc.property(
-        fc.array(noteArb, { maxLength: 14 }).chain((arr) => fc.tuple(fc.constant(arr), fc.shuffledSubarray(arr, { minLength: arr.length, maxLength: arr.length }))),
+        fc.array(noteArb, { maxLength: 14 }).map((arr) => arr.map((n, i) => ({ ...n, id: `${n.author.id}.${i}` }))).chain((arr) => fc.tuple(fc.constant(arr), fc.shuffledSubarray(arr, { minLength: arr.length, maxLength: arr.length }))),
         ([arr, shuffled]) => {
           expect(fold(shuffled)).toEqual(fold(arr));
           expect(fold([...arr, ...arr])).toEqual(fold(arr));
@@ -84,10 +84,15 @@ describe('mergeNote', () => {
     expect(after.changed).toBe(false);
   });
 
-  it('picks the same winner both ways for a colliding id', () => {
+  it('keeps the first immutable fields and ORs conflicting tombstones', () => {
     const a: Note = { id: 'AAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false };
     const b: Note = { ...a, pos: [9, 9, 9], text: 'rib' };
-    expect(mergeNote(a, b).note).toEqual(mergeNote(b, a).note);
+    expect(mergeNote(a, b).note).toBe(a);
+    expect(mergeNote(b, a).note).toBe(b);
+    expect(mergeNote(a, { ...b, text: 'aaa' }).note.text).toBe('hip');
+    const tomb = { ...b, deleted: true, text: '' };
+    expect(mergeNote(tomb, a).note).toEqual(tomb);
+    expect(mergeNote(a, tomb).note).toEqual({ ...a, deleted: true, text: '' });
   });
 
   it('does not let a stale live copy resurrect a deleted note', () => {

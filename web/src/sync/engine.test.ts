@@ -403,3 +403,28 @@ describe('transport identity', () => {
     expect(a.engine.state.peers.size).toBe(2);
   });
 });
+
+
+describe('note authorship', () => {
+  it('rejects live notes and deletes attributed to another sender but accepts snapshot relays', () => {
+    const a = mk(new FakeHub(), 'A');
+    a.engine.start();
+    const n = noteBy('C', 1);
+    a.end.inject({ v: 1, k: 'note', from: peer('B').id, note: n });
+    expect(a.engine.state.notes.size).toBe(0);
+    a.end.inject({ v: 1, k: 'snapshot', from: peer('B').id, notes: [n] });
+    expect(a.engine.state.notes.get(n.id)).toEqual(n);
+    a.end.inject({ v: 1, k: 'note', from: peer('B').id, note: { ...n, deleted: true, text: '' } });
+    expect(a.engine.state.notes.get(n.id)?.deleted).toBe(false);
+  });
+
+  it('does not emit local deletes for another author', () => {
+    const a = mk(new FakeHub(), 'A');
+    a.engine.start();
+    const n = noteBy('B', 1);
+    a.end.inject({ v: 1, k: 'note', from: peer('B').id, note: n });
+    a.engine.deleteNote(n.id);
+    expect(a.engine.state.notes.get(n.id)?.deleted).toBe(false);
+    expect(a.end.sent.filter((w) => w.k === 'note')).toHaveLength(0);
+  });
+});
