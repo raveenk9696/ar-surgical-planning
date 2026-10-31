@@ -1,3 +1,4 @@
+import { LIMITS } from '../config';
 import type { PeerId, Presence, RoomState } from '../types';
 import { byId, h } from './dom';
 
@@ -25,7 +26,8 @@ export function createRoster(selfId: PeerId): Roster {
     slotOf,
     colorOf: (id) => palette()[slotOf(id)] ?? '#64748b',
     update(s) {
-      for (const id of s.peers.keys()) if (!order.includes(id)) order.push(id);
+      for (let i = order.length - 1; i >= 0; i--) if (!s.peers.has(order[i]!)) order.splice(i, 1);
+      for (const id of s.peers.keys()) if (order.length < LIMITS.maxPeers && !order.includes(id)) order.push(id);
     },
   };
 }
@@ -52,6 +54,9 @@ export function createPeopleView(roster: Roster, o: { onOpenSecond(): void; onOp
   return {
     render(s) {
       const peers: Presence[] = [...s.peers.values()];
+      const visible = new Set(peers.slice(0, MAX_ROWS - 1).map((p) => p.peer.id));
+      for (const id of lastPtr.keys()) if (!visible.has(id)) lastPtr.delete(id);
+      for (const id of pulseUntil.keys()) if (!visible.has(id)) pulseUntil.delete(id);
       const rows: HTMLElement[] = [h('li', { class: 'person you' }, h('span', { text: 'You' }))];
       for (const p of peers.slice(0, MAX_ROWS - 1)) {
         const key = p.ptr ? p.ptr.join(',') : '';
