@@ -57,14 +57,14 @@ function digest(x: unknown): Digest | null {
   return { n, h };
 }
 
-function note(x: unknown): Note | null {
+function note(x: unknown, now: number): Note | null {
   if (!exact(x, ['id', 'pos', 'nrm', 'mesh', 'text', 'author', 'created', 'deleted', 'publicKey', 'signature', 'deletion'])) return null;
   const id = typeof x.id === 'string' && NOTE_ID.test(x.id) ? x.id : null;
   const pos = vec3(x.pos, LIMITS.coordMm);
   const nrm = vec3(x.nrm, 1.0001);
   const mesh: Mesh | null = x.mesh === 'bone' || x.mesh === 'skin' ? x.mesh : null;
   const author = peer(x.author);
-  const created = typeof x.created === 'number' && Number.isFinite(x.created) && x.created >= 0 ? x.created : null;
+  const created = typeof x.created === 'number' && Number.isFinite(x.created) && x.created >= now - LIMITS.maxNoteAgeMs && x.created <= now + LIMITS.maxClockSkewMs ? x.created : null;
   const deleted = typeof x.deleted === 'boolean' ? x.deleted : null;
   if (!id || !pos || !nrm || !mesh || !author || created === null || deleted === null) return null;
   if (id.slice(0, 8) !== author.id) return null;
@@ -80,7 +80,7 @@ function note(x: unknown): Note | null {
   return { id, pos, nrm, mesh, text: body, author, created, deleted, publicKey: x.publicKey, signature: x.signature, deletion };
 }
 
-export function decode(raw: unknown): Wire | null {
+export function decode(raw: unknown, now = Date.now()): Wire | null {
   if (!isObj(raw) || raw.v !== 2) return null;
   switch (raw.k) {
     case 'hello': {
@@ -103,7 +103,7 @@ export function decode(raw: unknown): Wire | null {
     case 'note': {
       if (!exact(raw, ['v', 'k', 'from', 'note'])) return null;
       const from = peerId(raw.from);
-      const n = note(raw.note);
+      const n = note(raw.note, now);
       return from && n && n.author.id === from ? { v: 2, k: 'note', from, note: n } : null;
     }
     case 'snapshot': {
@@ -113,9 +113,8 @@ export function decode(raw: unknown): Wire | null {
       if (!from || !Array.isArray(list) || list.length > LIMITS.maxRecords) return null;
       const notes: Note[] = [];
       for (const item of list as unknown[]) {
-        const n = note(item);
-        if (!n) return null;
-        notes.push(n);
+        const n = note(item, now);
+        if (n) notes.push(n);
       }
       return { v: 2, k: 'snapshot', from, notes };
     }

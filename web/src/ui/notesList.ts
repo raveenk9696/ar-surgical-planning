@@ -4,6 +4,11 @@ import type { Roster } from './people';
 
 const TIME = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
 
+export function noteTime(created: number): { text: string; datetime: string } {
+  try { return { text: TIME.format(created), datetime: new Date(created).toISOString() }; }
+  catch { return { text: 'Time unavailable', datetime: '' }; }
+}
+
 export interface NotesView {
   render(s: RoomState, changed: readonly NoteId[]): void;
   recolor(): void;
@@ -23,7 +28,8 @@ export function createNotesView(
   function card(n: Note, self: string): HTMLElement {
     const dot = h('span', { class: 'dot', attrs: { 'data-author': n.author.id } });
     dot.style.setProperty('--dot', roster.colorOf(n.author.id));
-    const meta = h('span', { class: 'meta' }, document.createTextNode(`${n.author.name}, `), h('time', { text: TIME.format(n.created), attrs: { datetime: new Date(n.created).toISOString() } }));
+    const time = noteTime(n.created);
+    const meta = h('span', { class: 'meta' }, document.createTextNode(`${n.author.name}, `), h('time', { text: time.text, attrs: { datetime: time.datetime } }));
     const del =
       n.author.id === self
         ? h('button', { class: 'textbtn delete', text: 'Delete', attrs: { type: 'button', 'aria-label': `Delete note ${n.text}` } })

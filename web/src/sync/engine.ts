@@ -240,7 +240,7 @@ export function createEngine(o: {
   }
 
   function inbound(raw: unknown, link: Link): void {
-    const msg = decode(raw);
+    const msg = decode(raw, now());
     if (!msg) {
       if (!newerReported && isNewerVersion(raw)) {
         newerReported = true;

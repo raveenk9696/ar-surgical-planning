@@ -406,11 +406,11 @@ describe('mergeNotes caps', () => {
   });
 
   it('stops at 300 records, counting tombstones, but still applies deletes', async () => {
-    const tombs = Array.from({ length: 320 }, (_, i) => noteBy('B', i + 1, { created: i + 1, deleted: true, text: '' }));
+    const tombs = Array.from({ length: 320 }, (_, i) => noteBy('B', i + 1, { created: Date.now() - 1000 + i + 1, deleted: true, text: '' }));
     const full = mergeNotes(new Map(), tombs);
     await settle();
     expect(full.size).toBe(300);
-    const incoming = noteBy('C', 1, { created: 0 });
+    const incoming = noteBy('C', 1, { created: Date.now() - 10_000 });
     const merged = mergeNotes(full, [incoming]);
     await settle();
     expect(merged.size).toBe(300);
@@ -595,7 +595,7 @@ it('converges three replicas after concurrent adds at 99 notes with loss, duplic
 });
 
 it('keeps the same 300 records regardless of union order and notifies about evicted pins', async () => {
-  const notes = Array.from({ length: 301 }, (_, i) => noteBy('B', i + 1, { created: 1, deleted: true, text: '' }));
+  const notes = Array.from({ length: 301 }, (_, i) => noteBy('B', i + 1, { created: Date.now() - 1, deleted: true, text: '' }));
   await settle();
   expect(mergeNotes(new Map(), notes)).toEqual(mergeNotes(new Map(), [...notes].reverse()));
   const a = mk(new FakeHub(), 'A');
@@ -605,7 +605,7 @@ it('keeps the same 300 records regardless of union order and notifies about evic
   const changes: string[] = [];
   a.engine.subscribe((_s, c) => changes.push(...c.notes));
   const before = new Set(a.engine.state.notes.keys());
-  a.end.inject({ v: 2, k: 'note', from: peer('C').id, note: noteBy('C', 1, { created: 0 }) });
+  a.end.inject({ v: 2, k: 'note', from: peer('C').id, note: noteBy('C', 1, { created: Date.now() - 10_000 }) });
   await settle();
   expect(a.engine.state.notes.has(`${peer('C').id}.1`)).toBe(true);
   const evicted = [...before].find((id) => !a.engine.state.notes.has(id));

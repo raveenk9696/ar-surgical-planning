@@ -1,3 +1,4 @@
+import { runSteps } from './ui/steps';
 import '@fontsource-variable/inter/wght.css';
 import '@fontsource/homemade-apple/latin-400.css';
 import './styles/tokens.css';
@@ -129,14 +130,14 @@ async function boot(): Promise<void> {
   setTimeout(renderStatus, WAIT_FOR_PEER_MS + 50);
 
   engine.subscribe((s, c) => {
-    if (c.peers) {
-      roster.update(s);
-      people.render(s);
-      notesView.recolor();
-    }
-    if (c.notes.length) notesView.render(s, c.notes);
-    viewer?.sync(s, c);
-    if (c.link || c.peers) renderStatus();
+    runSteps(
+      () => { if (c.peers) roster.update(s); },
+      () => { if (c.peers) people.render(s); },
+      () => { if (c.peers) notesView.recolor(); },
+      () => { if (c.notes.length) notesView.render(s, c.notes); },
+      () => viewer?.sync(s, c),
+      () => { if (c.link || c.peers) renderStatus(); },
+    );
   });
 
   addEventListener('keydown', (e) => {

@@ -1,5 +1,7 @@
 export const LIMITS = {
   textMax: 24,
+  maxNoteAgeMs: 25 * 3600_000,
+  maxClockSkewMs: 120_000,
   maxLive: 100,
   maxRecords: 300,
   perAuthor: 20,

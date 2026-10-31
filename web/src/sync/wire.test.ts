@@ -4,7 +4,7 @@ import type { Note, Wire } from '../types';
 import { decode, isNewerVersion } from './wire';
 
 const peer = { id: 'AAAAAAAA', name: 'Guest 2' };
-const note: Note = { id: 'AAAAAAAA.1', pos: [10, -20, -300], nrm: [0, -1, 0], mesh: 'bone', text: 'left hip', author: peer, created: 1_700_000_000_000, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
+const note: Note = { id: 'AAAAAAAA.1', pos: [10, -20, -300], nrm: [0, -1, 0], mesh: 'bone', text: 'left hip', author: peer, created: Date.now(), deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
 const digest = { n: 1, h: 123 };
 const valid: Wire[] = [
   { v: 2, k: 'hello', from: peer, digest },
@@ -96,5 +96,5 @@ describe('isNewerVersion', () => {
 
 it.each(['\u200B', '\u202E', '\u2066', '\u2028', '\u2029', 'ｈｉｐ'])('rejects unsafe or non-normalized note text %j', (text) => {
   expect(decode(withNote({ text }))).toBeNull();
-  expect(decode({ v: 2, k: 'snapshot', from: peer.id, notes: [{ ...note, text }] })).toBeNull();
+  expect(decode({ v: 2, k: 'snapshot', from: peer.id, notes: [{ ...note, text }] })).toMatchObject({ notes: [] });
 });

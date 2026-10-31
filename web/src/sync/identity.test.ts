@@ -30,6 +30,12 @@ describe('signed records at the boundary', () => {
   it('accepts a relayed author deletion with its signed note and rejects an orphan deletion', async () => {
     const n = noteBy('A', 1, { deleted: true });
     expect(await verifyNote(n)).toBe(true);
-    expect(decode({ v: 2, k: 'snapshot', from: identity('B').peer.id, notes: [n.deletion] })).toBeNull();
+    expect(decode({ v: 2, k: 'snapshot', from: identity('B').peer.id, notes: [n.deletion] })).toMatchObject({ notes: [] });
   });
+});
+
+it.each([1e16, Date.now() - 25 * 3600_000 - 1000, Date.now() + 120_000 + 1000])('drops the verifier timestamp poison %s on wire and reload', async (created) => {
+  const n = noteBy('A', 1, { created });
+  expect(decode({ v: 2, k: 'note', from: n.author.id, note: n })).toBeNull();
+  expect(await loadCache('ROOM', { getItem: () => JSON.stringify({ savedAt: Date.now(), notes: [n] }) }, Date.now())).toEqual([]);
 });
