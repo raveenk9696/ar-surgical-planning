@@ -16,6 +16,7 @@ export function createNoteInput(o: { onSubmit(text: string): void; onCancel(): v
     input.value = Array.from(input.value).slice(0, LIMITS.textMax).join('');
   });
   let open = false;
+  let focusTimer: ReturnType<typeof setTimeout> | undefined;
 
   const cancel = (): void => {
     if (!open) return;
@@ -49,6 +50,9 @@ export function createNoteInput(o: { onSubmit(text: string): void; onCancel(): v
       form.hidden = false;
       input.value = '';
       input.focus({ preventScroll: true });
+      // Touch-generated mouse events can blur the field after pointerup.
+      clearTimeout(focusTimer);
+      focusTimer = setTimeout(() => { if (open) input.focus({ preventScroll: true }); }, 0);
       document.addEventListener('pointerdown', outside, true);
     },
     move(x, y) {
@@ -58,6 +62,7 @@ export function createNoteInput(o: { onSubmit(text: string): void; onCancel(): v
     },
     hide() {
       open = false;
+      clearTimeout(focusTimer);
       form.hidden = true;
       document.removeEventListener('pointerdown', outside, true);
     },
