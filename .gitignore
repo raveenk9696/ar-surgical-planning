@@ -1,0 +1,13 @@
+# Scans and models stay out of git. tools/publish_check.py fails if one gets in.
+*.dcm
+*.ply
+*.obj
+*.nii
+*.nii.gz
+data/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+viewer/build/
+.DS_Store
