@@ -227,7 +227,13 @@ export function createViewer(
         stage.setLayout({ cx: W / 2, cy: H / 2, areaW: W, areaH: H * (0.8 / 0.7) });
       } else if (matchMedia('(min-width: 960px)').matches) {
         const free = Math.max(320, (document.getElementById('rail')?.getBoundingClientRect().left ?? W) - 24);
-        stage.setLayout({ cx: free / 2, cy: H * 0.54, areaW: free, areaH: H });
+        if (document.body.classList.contains('hero-together')) {
+          stage.setLayout({ cx: free / 2, cy: H * 0.45, areaW: free, areaH: H * 0.82 });
+        } else {
+          const top = (document.querySelector('.title-block')?.getBoundingClientRect().bottom ?? 200) + 24;
+          const bottom = (document.querySelector('.dock')?.getBoundingClientRect().top ?? H - 100) - 24;
+          stage.setLayout({ cx: free / 2, cy: (top + bottom) / 2, areaW: free, areaH: Math.max(100, bottom - top) * (0.9 / 0.7) });
+        }
       } else {
         stage.setLayout({ cx: W / 2, cy: H * 0.42, areaW: W, areaH: Math.max(H * 0.5, H - 300) });
       }

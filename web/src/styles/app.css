@@ -113,8 +113,12 @@ h1 { margin: 0; max-width: 15em; font-size: clamp(1.75rem, 1.2rem + 1.6vw, 2.5re
 .in-ar .title-block, .in-ar .controls, .in-ar .rail, .in-ar .hint, .in-ar .dots, .in-ar .wash, .in-ar .progress, .in-ar .tile { display: none; }
 
 /* README renders */
-.hero-model .title-block, .hero-model .controls, .hero-model .rail, .hero-model .hint, .hero-model .dots, .hero-model .toast, .hero-model .wash { display: none; }
-.hero-together .hint, .hero-together .status, .hero-together .notice { display: none; }
+.hero-model .title-block, .hero-model .controls, .hero-model .rail, .hero-model .hint, .hero-model .dots, .hero-model .toast { display: none; }
+.hero-together .title-block, .hero-together .actions, .hero-together .hint, .hero-together .status, .hero-together .notice { display: none; }
+
+.hero-model .wash { width: 100vw; background: radial-gradient(ellipse 18% 5% at 50% 87%, rgb(59 130 246 / 16%), transparent 100%), var(--stage-wash); }
+.hero-together { --rail-w: 30vw; }
+.hero-together .rail { top: 48px; }
 
 @media (max-width: 959.98px) {
   :root { --free-w: 100vw; --gutter: 20px; }

@@ -149,7 +149,7 @@ export function createPins(marks: Object3D, view: { colorOf(id: PeerId): string;
           const size = textureSize(p.label.material.map as CanvasTexture);
           p.label.material.opacity = p.opacity;
           p.label.position.copy(p.pos);
-          placeFlat(p.label, world, size.h * (hovered === p.id ? 1.06 : 1), size.w / size.h, 0.04, v, v.xr ? 'y' : 'full');
+          placeFlat(p.label, world, size.h * (document.body.classList.contains('hero-model') ? 2.3 : 1) * (hovered === p.id ? 1.06 : 1), size.w / size.h, 0.04, v, v.xr ? 'y' : 'full');
         }
       }
     },

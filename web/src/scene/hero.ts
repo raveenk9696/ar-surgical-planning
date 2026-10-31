@@ -11,7 +11,7 @@ export type HeroMode = 'model' | 'together';
 
 const GUEST: Peer = { id: 'GUESTTWO', name: 'Guest 2' };
 // Anatomy points as LPS millimetres on the front of the scan. The probe finds the bone surface under each.
-const LEFT_HIP = { x: 95, z: -437 };
+const LEFT_HIP = { x: 70, z: -435 };
 const RIGHT_ILIAC = { x: -100, z: -330 };
 const POINTER = { x: -35, z: -330 };
 
