@@ -87,7 +87,8 @@ class DcmSequence:
             for file in files:
                 if file not in self._dcm_files:
                     ds = pydicom.dcmread(file)
-                    ds.decompress()
+                    if ds.file_meta.TransferSyntaxUID.is_compressed:
+                        ds.decompress()
                     self._collection.append(ds)
                     self._dcm_files.append(file)
 

@@ -126,7 +126,7 @@ def getImageData(img, threshold=50, ignore_alpha=True, w_samples=0,
         h_samples = height
 
     # resize image
-    image.thumbnail((w_samples, h_samples), Image.ANTIALIAS)
+    image.thumbnail((w_samples, h_samples), Image.Resampling.LANCZOS)
 
     # loop pixels
     for x in range(image.size[0]):

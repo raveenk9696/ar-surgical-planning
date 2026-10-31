@@ -25,8 +25,6 @@ def test_ct_series_to_colored_ply(tmp_path):
         meta.MediaStorageSOPClassUID = CTImageStorage
         meta.MediaStorageSOPInstanceUID = generate_uid()
         ds = FileDataset(str(filename), {}, file_meta=meta, preamble=b"\0" * 128)
-        ds.is_little_endian = True
-        ds.is_implicit_VR = False
         ds.SOPClassUID = meta.MediaStorageSOPClassUID
         ds.SOPInstanceUID = meta.MediaStorageSOPInstanceUID
         ds.StudyInstanceUID = study_uid
@@ -50,7 +48,7 @@ def test_ct_series_to_colored_ply(tmp_path):
         ds.RescaleSlope = 1
         ds.RescaleIntercept = 0
         ds.PixelData = pixels.tobytes()
-        ds.save_as(str(filename), write_like_original=False)
+        ds.save_as(str(filename), enforce_file_format=True)
 
     tmp_path.chmod(0o750)
     result = subprocess.run(
