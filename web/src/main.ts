@@ -106,6 +106,7 @@ async function boot(): Promise<void> {
     },
     onSecond: openSecond,
     onAr: () => startAr(),
+    onArUnavailable: () => status.toast('This browser does not support WebXR AR.'),
   });
 
   const notesView = createNotesView(roster, {

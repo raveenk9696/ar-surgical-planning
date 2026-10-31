@@ -20,6 +20,7 @@ export function createHud(o: {
   onShare(): void;
   onSecond(): void;
   onAr(): void;
+  onArUnavailable(): void;
 }): Hud {
   const skin = byId('btn-skin');
   const add = byId('btn-add');
@@ -102,8 +103,9 @@ export function createHud(o: {
   guarded(skin, () => o.onSkin(!skinOn));
   guarded(add, () => o.onArm(!armed));
   guarded(reset, o.onReset);
-  guarded(ar, () => {
+  ar.addEventListener('click', () => {
     if (arState === 'ready') o.onAr();
+    else if (arState === 'unsupported') o.onArUnavailable();
   });
   share.addEventListener('click', o.onShare);
   second.addEventListener('click', o.onSecond);

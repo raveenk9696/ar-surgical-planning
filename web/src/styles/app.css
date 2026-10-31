@@ -45,6 +45,7 @@ h1 { margin: 0; max-width: 15em; font-size: clamp(1.75rem, 1.2rem + 1.6vw, 2.5re
 .btn.primary:hover { transform: translateY(-1px); box-shadow: var(--lit-edge), 0 16px 28px -14px rgba(30, 64, 175, 0.8); }
 .btn.primary:active { transform: none; filter: brightness(0.94); }
 .btn[aria-disabled='true'] { filter: saturate(0.7); cursor: not-allowed; }
+.btn.primary[aria-disabled='true'] { background: var(--mist); color: var(--muted); box-shadow: none; opacity: 0.7; }
 .btn[aria-disabled='true']:hover { transform: none; }
 
 .controls { display: contents; }
