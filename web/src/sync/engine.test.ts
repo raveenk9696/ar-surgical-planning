@@ -428,3 +428,36 @@ describe('note authorship', () => {
     expect(a.end.sent.filter((w) => w.k === 'note')).toHaveLength(0);
   });
 });
+
+describe('link limits', () => {
+  it('cannot reset the five-note burst by rotating ids after bye', () => {
+    const a = mk(new FakeHub(), 'A');
+    a.engine.start();
+    for (const c of 'BCDEFGHIJK') {
+      a.end.inject({ v: 1, k: 'note', from: peer(c).id, note: noteBy(c, 1) }, 'nostr:one');
+      a.end.inject({ v: 1, k: 'bye', from: peer(c).id }, 'nostr:one');
+    }
+    expect(a.engine.state.notes.size).toBe(5);
+  });
+
+  it('keeps the live-note quota across identity changes and expiry', () => {
+    const a = mk(new FakeHub(), 'A');
+    a.engine.start();
+    for (let i = 1; i <= 21; i++) {
+      const c = i <= 10 ? 'B' : 'C';
+      a.end.inject({ v: 1, k: 'note', from: peer(c).id, note: noteBy(c, i) }, 'nostr:one');
+      run(8200);
+    }
+    expect(a.engine.state.notes.size).toBe(20);
+  });
+
+  it('cannot reset the snapshot gap by rotating ids after bye', () => {
+    const a = mk(new FakeHub(), 'A');
+    a.engine.start();
+    for (const c of 'BC') {
+      a.end.inject({ v: 1, k: 'snapshot', from: peer(c).id, notes: [noteBy(c, 1)] }, 'nostr:one');
+      a.end.inject({ v: 1, k: 'bye', from: peer(c).id }, 'nostr:one');
+    }
+    expect(a.engine.state.notes.size).toBe(1);
+  });
+});

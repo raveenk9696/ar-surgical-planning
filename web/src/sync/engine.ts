@@ -157,7 +157,7 @@ export function createEngine(o: {
   const tickMs = Math.round(1000 / LIMITS.presenceHz);
 
   const all = createLimiter({ burst: LIMITS.inboundPerSec, refillMs: 1000 / LIMITS.inboundPerSec }, now);
-  const perSender = {
+  const perLink = {
     note: createLimiter(LIMITS.noteBucket, now),
     snapshot: createLimiter({ burst: 1, refillMs: LIMITS.snapshotMinGapMs }, now),
     presence: createLimiter({ burst: 30, refillMs: 1000 / 30 }, now),
@@ -181,6 +181,7 @@ export function createEngine(o: {
   let lastSnapshotAt = -Infinity;
   let cacheDirtyAt: number | null = null;
   let newerReported = false;
+  const noteLinks = new Map<NoteId, Link>();
   const identities = new Map<PeerId, { link: Link; seenAt: number }>();
   const linkPeers = new Map<Link, PeerId>();
 
@@ -246,11 +247,26 @@ export function createEngine(o: {
     const bound = identities.get(from);
     if (bound && bound.link !== link) return;
     if (link !== 'tab' && linkPeers.has(link) && linkPeers.get(link) !== from) return;
-    if (msg.k !== 'bye' && !perSender[msg.k].take(from)) return;
+    if (msg.k !== 'bye' && !perLink[msg.k].take(link)) return;
     identities.set(from, { link, seenAt: now() });
     if (link !== 'tab') linkPeers.set(link, from);
     const t = now();
-    const { state: next, out } = reduce(state, msg, t);
+    let accepted = msg;
+    if (msg.k === 'note' || msg.k === 'snapshot') {
+      let owned = 0;
+      for (const [id, owner] of noteLinks) if (owner === link && state.notes.get(id)?.deleted === false) owned++;
+      const notes = (msg.k === 'note' ? [msg.note] : msg.notes).filter((n) => {
+        if (n.author.id !== from || n.deleted || state.notes.has(n.id)) return true;
+        if (owned >= LIMITS.perAuthor) return false;
+        noteLinks.set(n.id, link);
+        owned++;
+        return true;
+      });
+      if (msg.k === 'note') {
+        if (!notes.length) return;
+      } else accepted = { ...msg, notes };
+    }
+    const { state: next, out } = reduce(state, accepted, t);
     if (msg.k === 'bye') unbind(from);
     const notesChanged = next.notes !== state.notes;
     commit(next);
