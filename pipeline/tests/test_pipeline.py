@@ -4,11 +4,13 @@ import subprocess
 import sys
 
 import numpy as np
+import pytest
 from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.uid import CTImageStorage, ExplicitVRLittleEndian, generate_uid
 
 
-def test_ct_series_to_colored_ply(tmp_path):
+@pytest.mark.parametrize("slice_location", [True, False], ids=["with-slice-location", "without-slice-location"])
+def test_ct_series_to_colored_ply(tmp_path, slice_location):
     depth, height, width = 24, 64, 64
     row_spacing, column_spacing, slice_spacing = 0.7, 0.8, 2.5
     series_uid = generate_uid()
@@ -44,7 +46,8 @@ def test_ct_series_to_colored_ply(tmp_path):
         ds.ImageOrientationPatient = [1, 0, 0, 0, 1, 0]
         ds.PixelSpacing = [row_spacing, column_spacing]
         ds.SliceThickness = slice_spacing
-        ds.SliceLocation = z * slice_spacing
+        if slice_location:
+            ds.SliceLocation = z * slice_spacing
         ds.RescaleSlope = 1
         ds.RescaleIntercept = 0
         ds.PixelData = pixels.tobytes()
