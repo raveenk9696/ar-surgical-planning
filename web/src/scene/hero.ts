@@ -11,8 +11,8 @@ export type HeroMode = 'model' | 'together';
 
 const GUEST: Peer = { id: 'GUESTTWO', name: 'Guest 2' };
 // Anatomy points as LPS millimetres on the front of the scan. The probe finds the bone surface under each.
-const LEFT_HIP = { x: 95, z: -405 };
-const RIGHT_ILIAC = { x: -85, z: -300 };
+const LEFT_HIP = { x: 95, z: -437 };
+const RIGHT_ILIAC = { x: -100, z: -330 };
 const POINTER = { x: -35, z: -330 };
 
 /** A transport with no network. In hero mode the page talks only to a made-up second person. */
@@ -47,6 +47,7 @@ function noteAt(id: string, text: string, hit: Hit, author: Peer): Note {
 export function applyHero(mode: HeroMode, h: { viewer: Viewer; engine: Engine; transport: Pick<Transport & { inject(w: Wire): void }, 'inject'>; model: ModelHandle }): boolean {
   const { viewer, engine, transport, model } = h;
   document.body.classList.add(`hero-${mode}`);
+  viewer.layout();
   if (mode === 'model') {
     viewer.stage.setView(28, 10);
     const hit = probeFront(model, LEFT_HIP.x, LEFT_HIP.z);

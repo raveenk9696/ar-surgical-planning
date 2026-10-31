@@ -222,7 +222,10 @@ export function createViewer(
     layout() {
       const W = innerWidth;
       const H = innerHeight;
-      if (matchMedia('(min-width: 960px)').matches) {
+      if (document.body.classList.contains('hero-model')) {
+        // No panels: centre the model. fitDistance fills 70% of areaH, so 80/70 of the height gives an 80% model.
+        stage.setLayout({ cx: W / 2, cy: H / 2, areaW: W, areaH: H * (0.8 / 0.7) });
+      } else if (matchMedia('(min-width: 960px)').matches) {
         const free = Math.max(320, (document.getElementById('rail')?.getBoundingClientRect().left ?? W) - 24);
         stage.setLayout({ cx: free / 2, cy: H * 0.54, areaW: free, areaH: H });
       } else {

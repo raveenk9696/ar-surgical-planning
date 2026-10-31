@@ -195,7 +195,13 @@ function boot(): void {
   }).then(
     (model) => {
       bar.hidden = true;
-      if (flags.hero && heroTransport) applyHero(flags.hero, { viewer: v, engine, transport: heroTransport, model });
+      if (flags.hero && heroTransport) {
+        const mode = flags.hero;
+        void v.stage.firstFrame.then(() => {
+          applyHero(mode, { viewer: v, engine, transport: heroTransport, model });
+          hud.setSkin(v.skinOn());
+        });
+      }
       const ar = setupAr(v.stage, model, engine, {
         viewer: v,
         overlay: byId('ar-overlay'),
