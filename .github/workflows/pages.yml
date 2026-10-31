@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
+  group: pages-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
   cancel-in-progress: false
 
 env:
@@ -21,6 +21,9 @@ env:
 
 jobs:
   build:
+    permissions:
+      contents: read
+      pages: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -63,20 +66,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.25.0'
-          cache: false
       - name: Install gitleaks 8.30.1
         run: |
           curl --fail --location --silent --show-error \
-            https://github.com/gitleaks/gitleaks/archive/refs/tags/v8.30.1.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
             --output "$RUNNER_TEMP/gitleaks.tar.gz"
-          printf '%s  %s\n' 'e90fb266d75837e75894c778bf594ab8e2787f12dce5a62651f21b893eaf9abb' "$RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
-          mkdir -p "$RUNNER_TEMP/gitleaks-source"
-          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks-source" --strip-components=1
-          cd "$RUNNER_TEMP/gitleaks-source"
-          go build -trimpath -ldflags='-s -w -X github.com/zricethezav/gitleaks/v8/version.Version=8.30.1' -o "$RUNNER_TEMP/gitleaks" .
+          printf '%s  %s\n' '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb' "$RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
           sudo install -m 755 "$RUNNER_TEMP/gitleaks" /usr/local/bin/gitleaks
           gitleaks version
       - run: python tools/publish_check.py
