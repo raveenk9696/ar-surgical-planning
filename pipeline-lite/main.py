@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('path', metavar='p', type=str,
                         help='The directory or file path of the DICOM images')
     args = parser.parse_args()
-    path = args.path.toString()
+    path = args.path
 
 # Timer Start
     startTime = time.time()
@@ -24,6 +24,7 @@ if __name__ == '__main__':
     dcmList = readDICOM(path)
     sortedDCMList_Position = sortDICOM_Position(dcmList)
     width, height, depth = boundingBoxCalc(dcmList)
+    print(f"Bounding box (mm): width {width:.1f}, height {height:.1f}, depth {depth:.1f}")
 # Timer End
     executionTime = (time.time() - startTime)
     print('Execution time in seconds: ' + str(executionTime))

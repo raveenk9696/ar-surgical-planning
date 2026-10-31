@@ -12,7 +12,7 @@ def readDICOM(inputdir):
     test_list = []
     for file in os.listdir(inputdir):
         if file.endswith(".dcm"):
-            test_list.append(pydicom.read_file(os.path.join(inputdir, file)))
+            test_list.append(pydicom.dcmread(os.path.join(inputdir, file)))
     return test_list
 
 #%%
