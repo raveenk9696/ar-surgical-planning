@@ -7,8 +7,9 @@ const PEER_ID = /^[A-Z2-7]{8}$/;
 const NOTE_ID = /^[A-Z2-7]{8}\.\d{1,9}$/;
 const FORBIDDEN_KEYS = ['__proto__', 'constructor', 'prototype'];
 const NAME_MAX = 16;
-// Control characters have no place in a 1-3 word note or a guest name.
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
+export function isSafeText(value: string): boolean {
+  return !/[\p{Cc}\p{Cf}\u2028\u2029]/u.test(value) && value === value.normalize('NFKC');
+}
 
 function isObj(x: unknown): x is Obj {
   if (typeof x !== 'object' || x === null || Array.isArray(x)) return false;
@@ -23,7 +24,7 @@ function exact(o: unknown, keys: readonly string[]): o is Obj {
 }
 
 function text(x: unknown, min: number, max: number): string | null {
-  return typeof x === 'string' && x.length >= min && x.length <= max && !CONTROL.test(x) ? x : null;
+  return typeof x === 'string' && x.length >= min && x.length <= max && isSafeText(x) ? x : null;
 }
 
 function vec3(x: unknown, limit: number): Vec3 | null {

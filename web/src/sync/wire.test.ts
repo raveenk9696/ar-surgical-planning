@@ -93,3 +93,8 @@ describe('isNewerVersion', () => {
     expect(isNewerVersion('x')).toBe(false);
   });
 });
+
+it.each(['\u200B', '\u202E', '\u2066', '\u2028', '\u2029', 'ｈｉｐ'])('rejects unsafe or non-normalized note text %j', (text) => {
+  expect(decode(withNote({ text }))).toBeNull();
+  expect(decode({ v: 1, k: 'snapshot', from: peer.id, notes: [{ ...note, text }] })).toBeNull();
+});

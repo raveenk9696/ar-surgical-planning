@@ -5,7 +5,7 @@ import { loadCache, saveCache } from './cache';
 import { createLimiter } from './limiter';
 import { digestOf, mergeNote } from './notes';
 import { split } from './roomId';
-import { decode, isNewerVersion } from './wire';
+import { decode, isNewerVersion, isSafeText } from './wire';
 
 const HELLO_AT_MS = [1000, 3000, 7000];
 const CACHE_DEBOUNCE_MS = 500;
@@ -302,7 +302,9 @@ export function createEngine(o: {
       return () => void subs.delete(fn);
     },
     addNote(i) {
-      const text = i.text.replace(/\s+/g, ' ').trim().slice(0, LIMITS.textMax);
+      const normalized = i.text.normalize('NFKC');
+      if (!isSafeText(normalized)) return { ok: false, why: 'empty' };
+      const text = normalized.replace(/\s+/g, ' ').trim().slice(0, LIMITS.textMax);
       if (!text) return { ok: false, why: 'empty' };
       const { notes } = state;
       if (notes.size >= LIMITS.maxRecords || liveCount(notes) >= LIMITS.maxLive || liveCount(notes, self.id) >= LIMITS.perAuthor) {

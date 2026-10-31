@@ -461,3 +461,17 @@ describe('link limits', () => {
     expect(a.engine.state.notes.size).toBe(1);
   });
 });
+
+it('normalizes local fullwidth input before creating and sending a note', () => {
+  const a = mk(new FakeHub(), 'A');
+  a.engine.start();
+  expect(add(a.engine, 'ｌｅｆｔ　ｈｉｐ').ok).toBe(true);
+  expect(texts(a.engine)).toEqual(['left hip']);
+  expect(a.end.sent.at(-1)).toMatchObject({ k: 'note', note: { text: 'left hip' } });
+});
+
+it.each(['\u200B', '\u202E', '\u2066', '\u2028', '\u2029', '\u0000'])('rejects local control text %j', (ch) => {
+  const a = mk(new FakeHub(), 'A');
+  expect(add(a.engine, `a${ch}b`).ok).toBe(false);
+  expect(a.engine.state.notes.size).toBe(0);
+});
