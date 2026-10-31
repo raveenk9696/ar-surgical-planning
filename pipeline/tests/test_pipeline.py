@@ -62,17 +62,15 @@ def test_ct_series_to_colored_ply(tmp_path, slice_location):
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
-    ply = tmp_path / "DCMPLY" / "generated.ply"
-    with ply.open() as stream:
-        header = []
-        for line in stream:
-            header.append(line.strip())
-            if line.strip() == "end_header":
-                break
-        vertex_count = int(next(line.split()[2] for line in header
-                                if line.startswith("element vertex ")))
-        points = np.loadtxt(stream, ndmin=2)
+    lines = (tmp_path / "DCMPLY" / "generated.ply").read_text().splitlines()
+    assert "" not in lines, "the PLY has blank lines between its rows"
+    end = lines.index("end_header")
+    header, body = lines[:end + 1], lines[end + 1:]
+    vertex_count = int(next(line.split()[2] for line in header
+                            if line.startswith("element vertex ")))
+    points = np.loadtxt(body, ndmin=2)
 
+    assert header[0] == "ply"
     assert "format ascii 1.0" in header
     for axis in "xyz":
         assert f"property float32 {axis}" in header
