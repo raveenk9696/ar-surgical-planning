@@ -259,7 +259,7 @@ images: np.ndarray,
                 position = [0, 0, 0]
                 position[wI] = wB * pos[0]
                 position[hI] = hB * pos[1]
-                position[dI] = (dB / length) * i * multiplier
+                position[dI] = (dB / max(length - 1, 1)) * i * multiplier
 
                 # get strings
                 # rounding positions to 3 decimals
@@ -289,19 +289,16 @@ images: np.ndarray,
 
 
 # ----------------------------------------------------------------------------
-def generate_ply(images: np.ndarray, path: str, depth: int) -> str:
-# def generate_ply(images: np.ndarray, depth: int) -> str:
+def generate_ply(images: np.ndarray, path: str, depth: int, spacing: tuple) -> int:
     '''
-    Generate a PLY file from 3D array of images. Return the path of the ply file.
+    Generate an ASCII PLY from a (Z, H, W) uint8 stack. Return the vertex count.
     :param images: 3D numpy array of images
     :param path: path to save PLY file
-    :param depth: bounding box depth
-    :return: str the path of the PLY file
+    :param depth: number of original slices
+    :param spacing: original voxel spacing in mm as (row, column, slice)
+    :return: number of vertices
     '''
     print("***** BEGINNING PLY CONVERSION *****")
-
-    # Giving writing permissions
-    os.chmod(path, 0o777)
 
     ply_dir = os.path.join(path, "DCMPLY")
     if not os.path.exists(ply_dir):
@@ -309,8 +306,7 @@ def generate_ply(images: np.ndarray, path: str, depth: int) -> str:
     ply_path = os.path.join(ply_dir, "generated.ply")
 
     # get dimensions of PLY (assuming all the same height and width)
-    height = images[0].shape[1]
-    width = images[0].shape[2]
+    height, width = images.shape[1:]
     print(f"Dimensions (h, w, d) of Bounding Box: "
           f"({height}, {width}, {depth})")
 
@@ -319,7 +315,7 @@ def generate_ply(images: np.ndarray, path: str, depth: int) -> str:
     vertexCount = convertMP(
         images,
         ply_path,
-        [width, height, depth],
+        [width * spacing[1], height * spacing[0], (depth - 1) * spacing[2]],
         # [width, height, SliceNumber],
         direction="z",
         inverse=True,

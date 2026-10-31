@@ -16,11 +16,8 @@ def convertor(path,interp_factor):
     print(f"Utilizing {mp.cpu_count()} cores")
     images_temp = dcms.interpolate(interp_factor)
 
-    # Combining into one big list
-    # images = []
-    # for i in images_temp:
-    #     images.extend(i)
+    images = np.concatenate(images_temp, axis=0)
 
-    print(f"Done - Obtained {len(images_temp)} images")
-    pcd = generate_ply(images=np.asarray(images_temp),depth=depth,path=path)
+    print(f"Done - Obtained {len(images)} images")
+    pcd = generate_ply(images=images, depth=depth, path=path, spacing=dcms.voxel_spacing())
     print(pcd)

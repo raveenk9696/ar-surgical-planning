@@ -95,6 +95,15 @@ class DcmSequence:
         length = len(self._dcm_files)
         return length
 
+    def voxel_spacing(self) -> Tuple[float, float, float]:
+        first = self._collection[0]
+        if len(self._collection) > 1 and hasattr(first, "ImagePositionPatient"):
+            separation = np.linalg.norm(np.asarray(self._collection[1].ImagePositionPatient, dtype=float)
+                                        - np.asarray(first.ImagePositionPatient, dtype=float))
+        else:
+            separation = abs(float(getattr(first, "SpacingBetweenSlices", first.SliceThickness)))
+        return float(first.PixelSpacing[0]), float(first.PixelSpacing[1]), float(separation)
+
     def save_dcm(self, dest: str) -> None:
         """
         Save the dicom to the destination folder.
