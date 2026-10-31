@@ -13,7 +13,7 @@ DEPTH, HEIGHT, WIDTH = 24, 64, 64
 ROW_SPACING, COLUMN_SPACING, SLICE_SPACING = 0.7, 0.8, 2.5
 
 
-def write_series(directory, names, slice_location=True):
+def write_series(directory, names, slice_location=True, padded=False):
     depth, height, width = DEPTH, HEIGHT, WIDTH
     row_spacing, column_spacing, slice_spacing = ROW_SPACING, COLUMN_SPACING, SLICE_SPACING
     series_uid = generate_uid()
@@ -25,6 +25,8 @@ def write_series(directory, names, slice_location=True):
         pixels = np.full((height, width), -1000, dtype=np.int16)
         pixels[8:-8, 8:-8] = 0
         pixels[distance <= 4 + 4 * z // depth] = 1000
+        if padded:
+            pixels[distance > 34.5] = -3024
         filename = directory / names[z]
         meta = FileMetaDataset()
         meta.TransferSyntaxUID = ExplicitVRLittleEndian
@@ -69,11 +71,12 @@ def run_pipeline(directory):
     return (directory / "DCMPLY" / "generated.ply").read_text().splitlines()
 
 
-@pytest.mark.parametrize("slice_location", [True, False], ids=["with-slice-location", "without-slice-location"])
-def test_ct_series_to_colored_ply(tmp_path, slice_location):
+@pytest.mark.parametrize("slice_location, padded", [(True, False), (False, False), (True, True)],
+                         ids=["with-slice-location", "without-slice-location", "padded-outside-scan-circle"])
+def test_ct_series_to_colored_ply(tmp_path, slice_location, padded):
     depth, height, width = DEPTH, HEIGHT, WIDTH
     row_spacing, column_spacing, slice_spacing = ROW_SPACING, COLUMN_SPACING, SLICE_SPACING
-    write_series(tmp_path, [f"slice-{z:03d}.dcm" for z in range(depth)], slice_location)
+    write_series(tmp_path, [f"slice-{z:03d}.dcm" for z in range(depth)], slice_location, padded)
     tmp_path.chmod(0o750)
     lines = run_pipeline(tmp_path)
     assert "" not in lines, "the PLY has blank lines between its rows"
