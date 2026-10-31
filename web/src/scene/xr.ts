@@ -41,6 +41,16 @@ export interface Ar {
 
 type Phase = 'placing' | 'placed';
 
+export async function referenceSpaceType(session: Pick<XRSession, 'requestReferenceSpace'>): Promise<XRReferenceSpaceType> {
+  try {
+    await session.requestReferenceSpace('local-floor');
+    return 'local-floor';
+  } catch {
+    await session.requestReferenceSpace('local');
+    return 'local';
+  }
+}
+
 function reticle(): Group {
   const g = new Group();
   const ring = new Mesh(new RingGeometry(0.1, 0.12, 48), new MeshBasicMaterial({ color: BLUE, transparent: true, opacity: 0.9, side: DoubleSide, toneMapped: false }));
@@ -237,7 +247,7 @@ export function setupAr(stage: Stage, model: ModelHandle, engine: Engine, ui: Ar
     restoreQuality = ui.viewer.quality;
     const renderer = stage.renderer;
     renderer.xr.enabled = true;
-    renderer.xr.setReferenceSpaceType('local-floor');
+    renderer.xr.setReferenceSpaceType(await referenceSpaceType(s));
     ui.viewer.setQuality('lite');
     stage.setXr(true);
     stage.stage.visible = false;
