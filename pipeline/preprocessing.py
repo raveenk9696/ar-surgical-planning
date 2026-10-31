@@ -187,15 +187,10 @@ def interpolate_dcm2vol(dcm_list: List[pydicom.dataset.FileDataset],
 
         elif ds.pixel_array.dtype == np.uint16 \
                 or ds.pixel_array.dtype == np.int16:
-            image = convert_int_to_uint(ds.pixel_array)
-            # image = apply_fiji_normalization(image)
-            img_min, img_max = int(np.min(image)), int(np.max(image))
-            scale = 256. / (img_max - img_min + 1)
-            x = image & 0xffff
-            x -= img_min
-            x[x < 0] = 0
-            x = x * scale + 0.5
-            x[x > 255] = 255
+            # One HU window for every slice. Scaling each slice by its own min and max
+            # kept air whenever the scanner padded outside the scan circle.
+            hu = ds.pixel_array * float(getattr(ds, "RescaleSlope", 1)) + float(getattr(ds, "RescaleIntercept", 0))
+            x = np.clip((hu + 1000) * (255 / 2000) + 0.5, 0, 255)
         volume.append(x.astype(np.uint8))
     volume = np.array(volume)
 
