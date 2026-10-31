@@ -1,49 +1,100 @@
 # AR surgical planning
 
-This project turns a CT scan into a 3D model of bone and skin that you can view on a Microsoft HoloLens or in a web browser.
+Turn a CT scan into 3D models of bone and skin, then mark them up together in a web browser or in AR.
 
-Surgeons often plan operations from 2D scan slices. In 2018, a 3D model of a CT scan took hours of image work by hand. This pipeline makes the model from the DICOM files without manual segmentation.
+**Live demo:** https://raveenk9696.github.io/ar-surgical-planning/ (open it in a second tab to watch notes and pointers sync)
+
+![Bone inside glass skin, made by this pipeline from a public CT scan](docs/hero-model.png)
+
+## Why I built it
+
+Surgeons often plan operations from 2D scan slices. In 2018, a 3D model of a CT scan took hours of image work by hand. I wanted a program that makes the model on its own, so a surgeon can look at the patient's anatomy in a headset.
 
 ## My role
 
 I started this project. In June 2018 I wrote a grant proposal for a HoloLens. I learned Python and Linux scripting to build the app in Dr Chamith Rajapakse's lab at the Hospital of the University of Pennsylvania. By 2019 my scripts turned CT scans into 3D models of bone and skin, and I checked them on a HoloLens. I then led a lab team that grew it into a web app where several people can view and annotate a scan's 3D model together in AR. I presented the work as first author at SPIE Medical Imaging 2020 and 2022, and it became my master's thesis.
 
-TODO(Raveen): say which parts of this repository you wrote yourself.
+I wrote the 2022 code in this repository, except the parts credited below. In 2026 I rebuilt it: I fixed the pipeline, added a surface export, and rebuilt the multi-user web app, which is not in the old lab code.
 
 ## What is in this repository
 
-- `pipeline/` is the 2022 Python pipeline. `main.py` reads a CT DICOM series, sorts the slices, scales them to 8-bit, interpolates new slices between them, drops pixels under an intensity threshold, and writes a colored PLY point cloud. `downsample.py` thins the cloud, `outlierRemoval.py` removes points by Mahalanobis distance, and `color_visualize.py` maps gray values to a color table.
-- `pipeline-lite/` reads a DICOM series and computes the size of the model's bounding box in millimeters from the DICOM headers.
-- `viewer/` is a React and three.js page that loads a PLY file and lets you rotate it.
-- `tools/publish_check.py` fails if any commit in the history holds medical images, 3D models, files over 5 MB, or secrets.
+- `pipeline/` turns a CT DICOM series into a colored point cloud (`main.py`) and into bone and skin surface meshes (`surfaces.py`, added in 2026). `fetch_sample.py` downloads a public sample scan and checks each file's SHA-256.
+- `pipeline-lite/` is a short script that prints the size of a scan's bounding box in millimeters.
+- `web/` is the 2026 web app. It shows the model, lets several people drop notes on it and see each other's pointers, and places it in the room on WebXR AR devices.
+- `tools/publish_check.py` fails if any commit holds medical images, 3D models, large files, personal emails, local paths, or secrets.
 
-The 2018 and 2019 scripts are not in git. The HoloLens client is a separate Unity project, [albert239825/HololensUnityProject](https://github.com/albert239825/HololensUnityProject).
+The 2018 and 2019 scripts are not in git. The lab's HoloLens client is a separate Unity project by Albert Chen, [albert239825/HololensUnityProject](https://github.com/albert239825/HololensUnityProject).
 
-## Status
+## Run the pipeline
 
-This is lab code from 2021 and 2022. At this commit `pipeline/main.py` stops at the PLY step: `convertor.py` passes chunks of slices where `generator.py` expects single slices.
+You need Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
-TODO: fix the pipeline, run it on a public sample scan, add tests, and add a screenshot of the result.
+```sh
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -r pipeline/requirements-dev.txt
+.venv/bin/python pipeline/fetch_sample.py abdomen --data-dir data
+.venv/bin/python pipeline/main.py data/abdomen 0.1
+.venv/bin/python pipeline/surfaces.py data/abdomen abdomen.glb --crop-z-min -350
+.venv/bin/python -m pytest -q pipeline/tests pipeline-lite
+```
+
+`main.py` writes `data/abdomen/DCMPLY/generated.ply`, a binary PLY with up to 2,000,000 points. `surfaces.py` writes a GLB with 2 meshes, `bone` and `skin`, in DICOM patient coordinates (millimeters). `--crop-z-min` removes skin below the hips. `pipeline/README.md` explains the steps, and `pipeline/validation.md` records the sizes and run times on both public samples.
+
+## Run the web app
+
+You need Node 24.
+
+```sh
+cd web
+npm ci
+npm run dev
+```
+
+`npm run dev` looks for a model at `/tmp/ar-web-models/abdomen.glb`, or at the path in `AR_MODEL_SRC`. Make one with `surfaces.py` first. The GitHub Pages workflow builds the model from the public scan on every deploy, so no model file is in git.
+
+## What changed in 2026
+
+The 2022 code did not run. These fixes each came with a test that failed first:
+
+- The PLY step crashed on the shape of the slice stack.
+- Slices were sorted by file name, not by position, so the model came out shuffled.
+- Each slice was scaled by its own minimum and maximum, so air stayed in the model on most scanners.
+- The brightest bone wrapped to 0 and dropped out.
+- Every row of the PLY file was followed by a blank line.
+- Interpolation stopped at the edge of every group of 3 slices.
+
+`generator.py` was an adapted copy of img2ply, which is GPL-3.0. Commit `eba824e` replaced it with new code so the repository can be MIT licensed. The point cloud is now binary, capped in size, free of the CT table, and in DICOM patient coordinates.
 
 ## Credits
 
 The git history keeps each commit's original author and date.
 
-| Git author | Work |
+| Person | Work |
 |---|---|
-| raveenk9696 (Raveen Kariyawasam) | Committed the pipeline (May 2022), `viewer/`, and `pipeline-lite/` (October 2022). |
-| solimaga | `downsample.py`, `outlierRemoval.py`, and `color_visualize.py` (June to August 2022). |
-| albid852 | `DcmSequence.py`, `preprocessing.py`, and `PlotDCM.py` come from albid852's DicomSequence repository (2021), with changes. `generator.py` comes from albid852's Python 3 port of img2ply in the same repository, with changes. |
-| albert239825 | The HoloLens Unity app, in its own repository. |
-| Robert Joosten | [img2ply](https://github.com/robertjoosten/img2ply) (2017, GPL-3.0), the base of `generator.py`. |
+| Raveen Kariyawasam ([raveenk9696](https://github.com/raveenk9696)) | Started and led the project. Wrote the code except the parts below. 2026 rebuild. |
+| Albi Domi ([albid852](https://github.com/albid852)) | `DcmSequence.py`, `preprocessing.py`, and `PlotDCM.py`, from his DicomSequence code (2021). |
+| Gabriel Soliman ([solimang](https://github.com/solimang)) | `downsample.py`, `outlierRemoval.py`, and `color_visualize.py` (2022). |
+| Albert Chen ([albert239825](https://github.com/albert239825)) | The HoloLens Unity app, in its own repository. |
+| Robert Joosten | [img2ply](https://github.com/robertjoosten/img2ply), the base of `generator.py` until commit `eba824e`. |
 
-TODO(Raveen): confirm each person's real name and that they agree to be named.
+The work was done in Dr Chamith Rajapakse's lab at the University of Pennsylvania.
 
 ## Publications
 
 - R. S. Kariyawasam, M. K. Song, P. Kodali, A. Chen, A. Domi, J. Cai, E. Almoamen, and C. Rajapakse. "Automated medical image based anatomical point cloud generation for collaborative real-time augmented reality applications." Proc. SPIE 12037, Medical Imaging 2022: Imaging Informatics for Healthcare, Research, and Applications, 120370R (2022). [doi:10.1117/12.2612993](https://doi.org/10.1117/12.2612993)
 - R. S. Kariyawasam, J. E. Somani, O. Sorci, H. Nagayumi, C. E. Witmer, B. J. Park, and C. S. Rajapakse. "Automated medical image based anatomical 3D model generation for augmented reality applications." Poster 11315-78, SPIE Medical Imaging 2020, Houston.
 
-## Patient data
+## Data
 
-This repository holds no patient data. The old private repositories held a CT scan from the lab. It is not part of this history.
+This repository holds no patient data. The lab's old private repositories held a CT scan, and it is not part of this history.
+
+The demo uses public scans from The Cancer Imaging Archive. The scans are downloaded at run time and never committed.
+
+- Abdomen (default): Saltz, J., et al. (2021). Stony Brook University COVID-19 Positive Cases. The Cancer Imaging Archive. [doi:10.7937/TCIA.BBAG-2923](https://doi.org/10.7937/TCIA.BBAG-2923). CC BY 4.0.
+- Legs: Vallières, M., Freeman, C. R., Skamene, S. R., and El Naqa, I. (2015). A radiomics model from joint FDG-PET and MRI texture features for the prediction of lung metastases in soft-tissue sarcomas of the extremities. The Cancer Imaging Archive, Soft-tissue-Sarcoma collection. [doi:10.7937/K9/TCIA.2015.7GO2GSKS](https://doi.org/10.7937/K9/TCIA.2015.7GO2GSKS). CC BY 3.0.
+
+Do not use these scans to identify anyone. This software is not for clinical use.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Commits before `eba824e` hold a `generator.py` adapted from img2ply. Those versions of that file are GPL-3.0.

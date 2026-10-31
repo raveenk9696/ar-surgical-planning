@@ -1,4 +1,4 @@
-# Verify CT exports
+# Pipeline
 
 Run these commands from the repository root.
 
