@@ -1,10 +1,12 @@
-"""Fail if any commit in this repo's history holds medical image data, large files, or secrets.
+"""Fail if this repo is not safe to make public.
 
-Run it before the repo goes public, and in CI. It reads every blob reachable from any ref,
-so a file deleted in a later commit still fails the check.
+It reads every object in the local git store, reachable or not, so a file
+deleted in a later commit still fails. It also checks commit emails, the
+license, and draft markers at HEAD. Run it before the repo goes public, and in CI.
 
 Usage: python tools/publish_check.py [repo]
 """
+import re
 import shutil
 import subprocess
 import sys
@@ -12,53 +14,88 @@ import sys
 MAX_BYTES = 5 * 1024 * 1024
 IMAGE_SUFFIXES = (".dcm", ".ima", ".nii", ".nii.gz", ".nrrd", ".mha", ".mhd", ".ply", ".obj", ".stl")
 BANNED_DIRS = ("node_modules/", "__pycache__/")
+DICOM_FIRST_ELEMENTS = (b"\x02\x00\x00\x00", b"\x08\x00\x05\x00", b"\x08\x00\x08\x00", b"\x08\x00\x16\x00", b"\x08\x00\x18\x00")
+OBJ_VERTEX = re.compile(rb"^v -?\d", re.MULTILINE)
+LOCAL_PATH = re.compile(rb"/Users/[A-Za-z]|C:\\\\?Users\\\\?[A-Za-z]")
+NOREPLY = ("@users.noreply.github.com", "noreply@github.com")
 
 
-def git(repo, *args):
-    return subprocess.run(["git", "-C", repo, *args], capture_output=True, check=True).stdout
+def git(repo, *args, check=True):
+    return subprocess.run(["git", "-C", repo, *args], capture_output=True, check=check).stdout.decode()
 
 
 def blobs(repo):
-    paths = {}
-    for line in git(repo, "rev-list", "--objects", "--all").decode().splitlines():
+    named = {}
+    for line in git(repo, "rev-list", "--objects", "--all").splitlines():
         sha, _, path = line.partition(" ")
         if path:
-            paths.setdefault(sha, path)
-    batch = subprocess.run(["git", "-C", repo, "cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize)"],
-                           input="\n".join(paths).encode(), capture_output=True, check=True).stdout
-    for line in batch.decode().splitlines():
-        sha, kind, size = line.split()
-        if kind == "blob":
-            yield sha, paths[sha], int(size)
-
-
-def problems(repo):
+            named.setdefault(sha, path)
+    listing = git(repo, "cat-file", "--batch-all-objects", "--batch-check=%(objectname) %(objecttype) %(objectsize)")
     reader = subprocess.Popen(["git", "-C", repo, "cat-file", "--batch"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    for sha, path, size in list(blobs(repo)):
-        lower = path.lower()
-        if lower.endswith(IMAGE_SUFFIXES):
-            yield f"medical image or 3D model file: {path}"
-        if any(f"/{d}" in f"/{lower}" for d in BANNED_DIRS) or lower.endswith(".ds_store"):
-            yield f"build or OS artifact: {path}"
-        if size > MAX_BYTES:
-            yield f"file over {MAX_BYTES // 1048576} MB ({size / 1048576:.1f} MB): {path}"
+    for line in listing.splitlines():
+        sha, kind, size = line.split()
+        if kind != "blob":
+            continue
         reader.stdin.write(f"{sha}\n".encode())
         reader.stdin.flush()
         reader.stdout.readline()
-        content = reader.stdout.read(size + 1)
-        if content[128:132] == b"DICM" and not lower.endswith(IMAGE_SUFFIXES):
-            yield f"DICOM data (DICM marker) under another name: {path}"
+        content = reader.stdout.read(int(size) + 1)[:-1]
+        yield named.get(sha, f"<object {sha[:12]} on no branch>"), content
     reader.stdin.close()
     reader.wait()
+
+
+def looks_like_dicom(content):
+    return content[128:132] == b"DICM" or content[:4] in DICOM_FIRST_ELEMENTS
+
+
+def looks_like_model(content):
+    return content.startswith((b"ply\n", b"ply\r\n", b"solid ")) or len(OBJ_VERTEX.findall(content[:65536])) >= 50
+
+
+def blob_problems(repo):
+    for path, content in blobs(repo):
+        lower = path.lower()
+        if lower.endswith(IMAGE_SUFFIXES):
+            yield f"data: medical image or 3D model file: {path}"
+        elif looks_like_dicom(content):
+            yield f"data: DICOM content under another name: {path}"
+        elif looks_like_model(content):
+            yield f"data: 3D model content under another name: {path}"
+        if any(f"/{d}" in f"/{lower}" for d in BANNED_DIRS) or lower.endswith((".ds_store", ".pyc")):
+            yield f"data: build or OS artifact: {path}"
+        if len(content) > MAX_BYTES:
+            yield f"data: file over {MAX_BYTES // 1048576} MB ({len(content) / 1048576:.1f} MB): {path}"
+        if LOCAL_PATH.search(content):
+            yield f"privacy: local user path in {path}"
+
+
+def history_problems(repo):
+    emails = set(git(repo, "log", "--all", "--format=%ae%n%ce").split())
+    emails |= set(re.findall(r"<([^>]+)>", git(repo, "log", "--all", "--format=%(trailers:valueonly)")))
+    for email in sorted(emails):
+        if not email.endswith(NOREPLY):
+            yield f"privacy: personal email in commit metadata: {email}"
+
+
+def head_problems(repo):
+    top_level = git(repo, "ls-tree", "--name-only", "HEAD").splitlines()
+    if not any(re.match(r"(LICEN[CS]E|COPYING)", name, re.I) for name in top_level):
+        yield "license: no LICENSE file at the repo root"
+    for hit in git(repo, "grep", "-n", "-I", "-E", "TODO[(:]", "HEAD", "--", ":!tools/publish_check.py", check=False).splitlines():
+        yield f"draft: {hit.split(':', 1)[1]}"
+
+
+def secret_problems(repo):
     if shutil.which("gitleaks") is None:
-        yield "gitleaks is not installed, so secrets were not checked"
+        yield "secrets: gitleaks is not installed, so secrets were not checked"
     elif subprocess.run(["gitleaks", "git", repo, "--redact", "--no-banner", "--log-level", "error"]).returncode:
-        yield "gitleaks found secrets in the history (output above)"
+        yield "secrets: gitleaks found secrets in the history (output above)"
 
 
 if __name__ == "__main__":
     repo = sys.argv[1] if len(sys.argv) > 1 else "."
-    found = sorted(set(problems(repo)))
+    found = sorted({*blob_problems(repo), *history_problems(repo), *head_problems(repo), *secret_problems(repo)})
     for line in found:
         print(f"FAIL {line}")
     print(f"publish check: {len(found)} problem(s)")
