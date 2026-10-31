@@ -50,12 +50,11 @@ cd web && npm ci && AR_MODEL_SRC=../abdomen.glb npm run dev
 
 Run the pipeline commands above first. `AR_MODEL_SRC=../abdomen.glb` connects their output to the web app.
 
-To build a local preview from `web/`, pack the model before the build.
+To build a local preview from `web/`, run these commands. `npm run build` packs the model first.
 
 ```sh
-node scripts/pack-model.mjs ../abdomen.glb public/models
-npm run build
-SMOKE_REQUIRE_MODEL=1 npm run smoke
+AR_MODEL_SRC=../abdomen.glb npm run build
+AR_MODEL_SRC=../abdomen.glb npm run smoke
 npm run preview
 ```
 
