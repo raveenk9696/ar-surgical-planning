@@ -9,10 +9,6 @@ from preprocessing import apply_clahe, apply_fiji_normalization, \
     apply_cr_normalization, convert_int_to_uint, interpolate_imgs2vol, \
     interpolate_dcm2vol, get_png
 from PlotDCM import plot_comparisons, multi_slice_viewer
-import multiprocessing as mp
-from functools import partial
-import tqdm
-from itertools import  repeat
 
 def _get_new_ds(ds: pydicom.dataset.Dataset, name: str):
     """
@@ -92,16 +88,10 @@ class DcmSequence:
                     self._collection.append(ds)
                     self._dcm_files.append(file)
 
-    def volume(self):
-        from volume import Volume
+    def volume(self, interp_factor=0):
+        from volume import from_datasets
 
-        if not self._collection:
-            raise ValueError("No DICOM slices found")
-        hu = np.stack([ds.pixel_array.astype(np.float32) * float(getattr(ds, "RescaleSlope", 1))
-                       + float(getattr(ds, "RescaleIntercept", 0)) for ds in self._collection])
-        row, column, gap = self.voxel_spacing()
-        affine = np.array([[0, 0, column, 0], [0, row, 0, 0], [-gap, 0, 0, 0], [0, 0, 0, 1]], dtype=float)
-        return Volume(hu, affine, str(self._collection[0].SeriesInstanceUID))
+        return from_datasets(self._collection, interp_factor)
 
     def stack_size(self):
         length = len(self._dcm_files)
@@ -347,30 +337,9 @@ class DcmSequence:
             multi_slice_viewer(np.array(self._masks[start:end]))
 
 
-    def interpolate(self, interp_factor: float, clahe: bool = False, norm_alg: int = 1) -> np.ndarray:
-        """
-        Create an interpolated volume from the image stack. This will interpolate slices of
-        images between every consecutive pair of slices. The num_slices determines how
-        many interpolated slices are between the original slices and the separation between them.
-        :param interp_factor: interpolation factor
-        :param clahe: whether or not to perform clahe on the images
-        :param norm_alg: which normalization algorithm to use to get the image between 0-255.
-        If using clahe, recommended to set norm_alg = 0. norm_alg = 1 is for the fiji
-        normalization. norm_alg = 2 is for CR normalization.
-        :return: the entire interpolated volume
-        """
-
-        ### Setting up pool
-        print("Initializing Multicore Pooling")
-        p = mp.Pool()
-        interpolate_dcm2volPartial = partial(interpolate_dcm2vol,interp_factor=interp_factor)
-        splitStack = np.array_split(self._collection, np.floor(len(self._collection)/3))
-        test = interpolate_dcm2vol(splitStack[0], interp_factor=interp_factor)
-        stack = list(tqdm.tqdm(p.imap(interpolate_dcm2volPartial, splitStack), total = len(splitStack)))
-        p.close()
-        p.join()
-        return stack
-
+    def interpolate(self, interp_factor: float) -> np.ndarray:
+        """Interpolate HU across the complete stack on uniformly spaced slice positions."""
+        return self.volume(interp_factor).hu
 
     def interpolate_mask_volume(self, num_slices: int = 4, binarize: bool = False, split_val: int = 128) -> np.ndarray:
         """

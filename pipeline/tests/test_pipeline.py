@@ -5,6 +5,7 @@ import sys
 
 import numpy as np
 import pytest
+import pydicom
 from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.uid import CTImageStorage, ExplicitVRLittleEndian, generate_uid
 
@@ -60,10 +61,10 @@ def write_series(directory, names, slice_location=True, padded=False):
         ds.save_as(str(filename), enforce_file_format=True)
 
 
-def run_pipeline(directory):
+def run_pipeline(directory, factor="0.1", *options):
     result = subprocess.run(
         [sys.executable, str(Path(__file__).resolve().parents[1] / "main.py"),
-         str(directory), "0.1"],
+         str(directory), str(factor), *map(str, options)],
         capture_output=True, text=True, timeout=120,
         env={**os.environ, "MPLBACKEND": "Agg"},
     )
@@ -101,8 +102,8 @@ def test_ct_series_to_colored_ply(tmp_path, slice_location, padded):
     assert (points[:, :2] >= 0).all()
     assert (points[:, 0] <= width * column_spacing).all()
     assert (points[:, 1] <= height * row_spacing).all()
-    assert (points[:, 2] <= 0).all()
-    assert (points[:, 2] >= -(depth - 1) * slice_spacing).all()
+    assert (points[:, 2] >= 0).all()
+    assert (points[:, 2] <= (depth - 1) * slice_spacing).all()
     assert ((points[:, 3:] >= 0) & (points[:, 3:] <= 255)).all()
     assert (points[:, 3:] == points[:, 3:].astype(np.uint8)).all()
     assert tmp_path.stat().st_mode & 0o777 == 0o750
@@ -126,3 +127,43 @@ def test_file_names_do_not_change_the_model(tmp_path):
     names = [f"slice-{z:03d}.dcm" for z in np.random.default_rng(0).permutation(DEPTH)]
     write_series(shuffled, names)
     np.testing.assert_array_equal(run_pipeline(shuffled)[1], run_pipeline(in_order)[1])
+
+
+def test_z_ramp_is_uniform_across_old_chunk_boundaries(tmp_path):
+    write_series(tmp_path, [f"{z}.dcm" for z in range(DEPTH)])
+    for file in tmp_path.glob("*.dcm"):
+        ds = pydicom.dcmread(file)
+        z = float(ds.ImagePositionPatient[2])
+        ds.PixelData = np.full((HEIGHT, WIDTH), round(z * 16), np.int16).tobytes()
+        ds.save_as(file, enforce_file_format=True)
+    points = run_pipeline(tmp_path, 1)[1]
+    zs = np.unique(points[:, 2])
+    assert len(zs) > DEPTH
+    np.testing.assert_allclose(np.diff(zs), zs[-1] / (len(zs) - 1), atol=1e-5)
+    gray = np.array([points[points[:, 2] == z, 3].mean() for z in zs])
+    expected = np.floor((zs * 16 + 1000) * 255 / 2000)
+    np.testing.assert_allclose(gray, expected, atol=1)
+    assert np.all(np.diff(gray) > 0)
+    assert np.ptp(np.diff(gray)) <= 1
+
+
+def test_left_marker_has_larger_patient_x_with_oblique_orientation(tmp_path):
+    write_series(tmp_path, [f"{z}.dcm" for z in range(DEPTH)])
+    for z in range(DEPTH):
+        file = tmp_path / f"{z}.dcm"
+        ds = pydicom.dcmread(file)
+        pixels = np.full((HEIGHT, WIDTH), -1000, np.int16)
+        pixels[8:-8, 8:-8] = 0
+        pixels[20:23, 30:33] = 500
+        pixels[40:43, 30:33] = 900
+        ds.PixelData = pixels.tobytes()
+        ds.ImageOrientationPatient = [0, 1, 0, -1, 0, 0]
+        ds.ImagePositionPatient = [100, 200, 300 + z * SLICE_SPACING]
+        ds.save_as(file, enforce_file_format=True)
+    points = run_pipeline(tmp_path)[1]
+    left = points[points[:, 3] == 191]
+    right = points[points[:, 3] == 242]
+    assert left.size and right.size
+    assert left[:, 0].min() > right[:, 0].max()
+    np.testing.assert_allclose(left[:, 0].max(), 86, atol=1e-4)
+    assert points[:, 2].min() == 300
