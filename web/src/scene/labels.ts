@@ -15,6 +15,11 @@ const WRAP_PX = 230;
 
 export interface FlatSize { w: number; h: number }
 
+export function fitNoteLabel(size: FlatSize): FlatSize {
+  const scale = Math.min(1, WRAP_PX / size.w);
+  return { w: size.w * scale, h: size.h * scale };
+}
+
 export const noteFontReady = (): Promise<unknown> => document.fonts.load(`${FONT_PX}px ${SCRIPT}`).catch(() => undefined);
 
 function canvas(w: number, h: number): { c: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
@@ -84,7 +89,7 @@ export function drawNoteLabel(text: string): CanvasTexture {
   ctx.lineWidth = 2;
   ctx.strokeStyle = NOTE_RED;
   ctx.stroke();
-  return texture(c, size);
+  return texture(c, fitNoteLabel(size));
 }
 
 /** A white disc with a red ring and a dot in the author's colour. The disc fills 80% of the square texture. */
