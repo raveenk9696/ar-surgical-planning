@@ -4,18 +4,6 @@ import numpy as np
 import open3d as o3d
 import argparse
 
-PLY_HEADER = """ply
-format ascii 1.0
-element vertex <VERTEXCOUNT>
-property float32 x
-property float32 y
-property float32 z
-property uchar red
-property uchar green
-property uchar blue
-end_header
-"""
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Provide path of PLY file and reduction factor")
     parser.add_argument('path', metavar='p', type=str,
@@ -37,7 +25,4 @@ if __name__ == '__main__':
 
     print("Saving new point cloud as downsampled")
 
-    #with open(path, "w") as f:
-        # write header
-        #f.write(PLY_HEADER)
     o3d.io.write_point_cloud("downsampled.ply", downsampled_pcd, write_ascii=True)

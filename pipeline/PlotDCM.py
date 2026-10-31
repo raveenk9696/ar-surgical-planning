@@ -1,3 +1,4 @@
+# Adapted from Albi Domi's DicomSequence code (2021).
 import numpy as np
 import matplotlib.pyplot as plt
 from preprocessing import apply_clahe, apply_cr_normalization, apply_fiji_normalization

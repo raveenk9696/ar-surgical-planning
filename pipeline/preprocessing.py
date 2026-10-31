@@ -1,3 +1,4 @@
+# Adapted from Albi Domi's DicomSequence code (2021).
 import numpy as np
 import pydicom
 import cv2
