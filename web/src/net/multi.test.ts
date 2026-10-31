@@ -21,8 +21,8 @@ describe('createMulti', () => {
     expect(a.sent).toEqual([bye]);
     expect(b.sent).toEqual([bye]);
     a.inject(1);
-    b.inject(2);
-    expect(raw.mock.calls).toEqual([[1], [2]]);
+    b.inject(2, 'nostr:b');
+    expect(raw.mock.calls).toEqual([[1, 'tab'], [2, 'nostr:b']]);
     a.setStatus({ tabs: 'ok' });
     b.setStatus({ net: 'ok', peers: 1 });
     expect(status).toHaveBeenCalledWith({ net: 'ok', peers: 1 });

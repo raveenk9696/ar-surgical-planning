@@ -362,3 +362,44 @@ describe('mergeNotes caps', () => {
     expect(gone.get('BBBBBBBB.1')?.deleted).toBe(true);
   });
 });
+
+
+describe('transport identity', () => {
+  it('drops a Nostr link claiming a different peer id', () => {
+    const a = mk(new FakeHub(), 'A');
+    a.engine.start();
+    a.end.inject({ v: 1, k: 'hello', from: peer('B'), digest: digestOf([]) }, 'nostr:b');
+    a.end.inject({ v: 1, k: 'note', from: peer('C').id, note: noteBy('C', 1) }, 'nostr:b');
+    expect(a.engine.state.notes.size).toBe(0);
+  });
+
+  it('drops forged higher-seq presence from another link without changing state', () => {
+    const a = mk(new FakeHub(), 'A');
+    a.engine.start();
+    const msg: Wire = { v: 1, k: 'presence', from: peer('B'), seq: 1, ptr: null, away: false, digest: digestOf([]) };
+    a.end.inject(msg, 'nostr:b');
+    const before = a.engine.state;
+    a.end.inject({ ...msg, seq: 999, from: { ...peer('B'), name: 'Impersonator' }, away: true }, 'nostr:attacker');
+    expect(a.engine.state).toBe(before);
+  });
+
+  it.each(['bye', 'expiry'])('releases an identity on %s', (reason) => {
+    const a = mk(new FakeHub(), 'A');
+    a.engine.start();
+    const hello: Wire = { v: 1, k: 'hello', from: peer('B'), digest: digestOf([]) };
+    a.end.inject(hello, 'nostr:b');
+    if (reason === 'bye') a.end.inject({ v: 1, k: 'bye', from: peer('B').id }, 'nostr:b');
+    else run(8200);
+    a.end.inject(hello, 'nostr:new');
+    expect(a.engine.state.peers.has(peer('B').id)).toBe(true);
+    a.end.inject({ ...hello, from: peer('C') }, 'nostr:b');
+    expect(a.engine.state.peers.has(peer('C').id)).toBe(true);
+  });
+
+  it('allows distinct trusted tabs to bind their own identities', () => {
+    const a = mk(new FakeHub(), 'A');
+    a.engine.start();
+    for (const c of ['B', 'C']) a.end.inject({ v: 1, k: 'hello', from: peer(c), digest: digestOf([]) }, 'tab');
+    expect(a.engine.state.peers.size).toBe(2);
+  });
+});

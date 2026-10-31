@@ -1,10 +1,12 @@
 import type { LinkStatus, Wire } from '../types';
 
+export type Link = 'tab' | `nostr:${string}`;
+
 export type StatusUpdate = Partial<LinkStatus> & { peers?: number };
 
 export interface Transport {
   send(w: Wire): void;
-  onMessage(fn: (raw: unknown) => void): () => void;
+  onMessage(fn: (raw: unknown, link: Link) => void): () => void;
   onStatus(fn: (s: StatusUpdate) => void): () => void;
   onPeerJoin(fn: () => void): () => void;
   open(): void;

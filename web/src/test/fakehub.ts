@@ -1,10 +1,10 @@
-import { createSignal, type StatusUpdate, type Transport } from '../net/transport';
+import { createSignal, type Link, type StatusUpdate, type Transport } from '../net/transport';
 import type { Wire } from '../types';
 
 export interface FakeEnd extends Transport {
   readonly name: string;
   /** Delivers a raw value as if a remote peer had sent it. */
-  inject(raw: unknown): void;
+  inject(raw: unknown, link?: Link): void;
   setStatus(s: StatusUpdate): void;
   join(): void;
   readonly sent: Wire[];
@@ -20,7 +20,7 @@ export class FakeHub {
   private count = 0;
 
   end(name: string): FakeEnd {
-    const message = createSignal<[unknown]>();
+    const message = createSignal<[unknown, Link]>();
     const status = createSignal<[StatusUpdate]>();
     const join = createSignal<[]>();
     const sent: Wire[] = [];
@@ -42,7 +42,7 @@ export class FakeHub {
       close: () => {
         open = false;
       },
-      inject: (raw) => message.emit(raw),
+      inject: (raw, link = 'tab') => message.emit(raw, link),
       setStatus: (s) => status.emit(s),
       join: () => join.emit(),
     };
@@ -65,7 +65,7 @@ export class FakeHub {
       if (this.dropEvery && ++this.count % this.dropEvery === 0) continue;
       const copies = this.duplicate ? 2 : 1;
       for (let i = 0; i < copies; i++) {
-        setTimeout(() => end.inject(structuredClone(w)), this.delayMs(from, to) + i);
+        setTimeout(() => end.inject(structuredClone(w), `nostr:${from}`), this.delayMs(from, to) + i);
       }
     }
   }

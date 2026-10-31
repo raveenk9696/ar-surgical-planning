@@ -1,5 +1,5 @@
 import { LIMITS } from '../config';
-import type { Transport } from '../net/transport';
+import type { Link, Transport } from '../net/transport';
 import type { AddResult, Digest, Mesh, Note, NoteId, Peer, PeerId, Presence, RoomState, Vec3, Wire } from '../types';
 import { loadCache, saveCache } from './cache';
 import { createLimiter } from './limiter';
@@ -181,6 +181,16 @@ export function createEngine(o: {
   let lastSnapshotAt = -Infinity;
   let cacheDirtyAt: number | null = null;
   let newerReported = false;
+  const identities = new Map<PeerId, { link: Link; seenAt: number }>();
+  const linkPeers = new Map<Link, PeerId>();
+
+  function unbind(id: PeerId): void {
+    const binding = identities.get(id);
+    if (binding && binding.link !== 'tab') linkPeers.delete(binding.link);
+    identities.delete(id);
+    mismatches.delete(id);
+  }
+
   const mismatches = new Map<PeerId, number>();
 
   function commit(next: RoomState): void {
@@ -222,7 +232,7 @@ export function createEngine(o: {
     return out;
   }
 
-  function inbound(raw: unknown): void {
+  function inbound(raw: unknown, link: Link): void {
     const msg = decode(raw);
     if (!msg) {
       if (!newerReported && isNewerVersion(raw)) {
@@ -233,10 +243,15 @@ export function createEngine(o: {
     }
     const from = senderOf(msg);
     if (from === self.id || !all.take('all')) return;
+    const bound = identities.get(from);
+    if (bound && bound.link !== link) return;
+    if (link !== 'tab' && linkPeers.has(link) && linkPeers.get(link) !== from) return;
     if (msg.k !== 'bye' && !perSender[msg.k].take(from)) return;
+    identities.set(from, { link, seenAt: now() });
+    if (link !== 'tab') linkPeers.set(link, from);
     const t = now();
     const { state: next, out } = reduce(state, msg, t);
-    if (msg.k === 'bye') mismatches.delete(from);
+    if (msg.k === 'bye') unbind(from);
     const notesChanged = next.notes !== state.notes;
     commit(next);
     if (notesChanged) cacheDirtyAt ??= t;
@@ -251,6 +266,7 @@ export function createEngine(o: {
     }
     const since = t - lastPresenceAt;
     if ((ptrDirty && !away && since >= tickMs - 10) || since >= LIMITS.heartbeatMs) sendPresence();
+    for (const [id, binding] of identities) if (t - binding.seenAt > LIMITS.peerTtlMs) unbind(id);
     commit(expirePeers(state, t));
     if (cacheDirtyAt !== null && t - cacheDirtyAt >= CACHE_DEBOUNCE_MS) flushCache();
   }

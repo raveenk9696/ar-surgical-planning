@@ -2,7 +2,7 @@ import type { JsonValue } from '@trystero-p2p/nostr';
 import { APP_ID, RELAYS } from '../config';
 import { split } from '../sync/roomId';
 import type { Wire } from '../types';
-import { createSignal, type StatusUpdate, type Transport } from './transport';
+import { createSignal, type Link, type StatusUpdate, type Transport } from './transport';
 
 const POLL_MS = 1000;
 const DOWN_AFTER_MS = 8000;
@@ -10,7 +10,7 @@ const OPEN = 1;
 
 /** Other devices, over WebRTC with public Nostr relays as the signalling channel. This module is only ever dynamic-imported. */
 export async function createNostrTransport(token: string, relays: readonly string[] = RELAYS): Promise<Transport> {
-  const message = createSignal<[unknown]>();
+  const message = createSignal<[unknown, Link]>();
   const status = createSignal<[StatusUpdate]>();
   const join = createSignal<[]>();
   const lib = await import('@trystero-p2p/nostr').catch(() => null);
@@ -61,7 +61,7 @@ export async function createNostrTransport(token: string, relays: readonly strin
       );
       const action = room.makeAction<JsonValue>('asp');
       send = (w) => void action.send(w as unknown as JsonValue).catch(() => undefined);
-      action.onMessage = (data) => message.emit(data);
+      action.onMessage = (data, { peerId }) => message.emit(data, `nostr:${peerId}`);
       room.onPeerJoin = (id) => {
         peers.add(id);
         status.emit({ peers: peers.size });

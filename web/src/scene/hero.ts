@@ -1,5 +1,5 @@
 import { Raycaster, Vector3 } from 'three';
-import { createSignal, type StatusUpdate, type Transport } from '../net/transport';
+import { createSignal, type Link, type StatusUpdate, type Transport } from '../net/transport';
 import type { Engine } from '../sync/engine';
 import type { Hit } from './pick';
 import { pick } from './pick';
@@ -16,7 +16,7 @@ const RIGHT_ILIAC = { x: -100, z: -330 };
 const POINTER = { x: -35, z: -330 };
 
 export function createHeroTransport(): Transport & { inject(w: Wire): void } {
-  const message = createSignal<[unknown]>();
+  const message = createSignal<[unknown, Link]>();
   const status = createSignal<[StatusUpdate]>();
   const join = createSignal<[]>();
   return {
@@ -26,7 +26,7 @@ export function createHeroTransport(): Transport & { inject(w: Wire): void } {
     onPeerJoin: join.on,
     open: () => status.emit({ tabs: 'off', net: 'off' }),
     close: () => undefined,
-    inject: (w) => message.emit(structuredClone(w)),
+    inject: (w) => message.emit(structuredClone(w), 'tab'),
   };
 }
 

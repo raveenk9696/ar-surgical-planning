@@ -1,8 +1,8 @@
 import type { Wire } from '../types';
-import { createSignal, type StatusUpdate, type Transport } from './transport';
+import { createSignal, type Link, type StatusUpdate, type Transport } from './transport';
 
 export function createTabsTransport(roomId: string, o: { enabled?: boolean } = {}): Transport {
-  const message = createSignal<[unknown]>();
+  const message = createSignal<[unknown, Link]>();
   const status = createSignal<[StatusUpdate]>();
   const join = createSignal<[]>();
   let channel: BroadcastChannel | null = null;
@@ -22,7 +22,7 @@ export function createTabsTransport(roomId: string, o: { enabled?: boolean } = {
         status.emit({ tabs: 'unavailable' });
       } else {
         channel = new BroadcastChannel(`asp:${roomId}`);
-        channel.onmessage = (e: MessageEvent<unknown>) => message.emit(e.data);
+        channel.onmessage = (e: MessageEvent<unknown>) => message.emit(e.data, 'tab');
         status.emit({ tabs: 'ok' });
       }
     },
