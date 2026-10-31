@@ -13,7 +13,7 @@ export interface Flags {
 
 export function parseFlags(search: string): Flags {
   const q = new URLSearchParams(search);
-  const debug = q.get('debug') === '1';
+  const debug = import.meta.env.DEV && q.get('debug') === '1';
   const relays = (q.get('relays') ?? '').split(',').map((r) => r.trim()).filter((r) => /^wss:\/\/[^\s]+$/.test(r));
   const transport = q.get('transport');
   const quality = q.get('quality');
@@ -34,5 +34,6 @@ declare global {
 }
 
 export function exposeDebug(engine: Engine, viewer?: Viewer): void {
+  if (!import.meta.env.DEV) return;
   window.__asp = { engine, state: () => engine.state, viewer };
 }
