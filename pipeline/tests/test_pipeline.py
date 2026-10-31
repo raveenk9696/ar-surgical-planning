@@ -86,3 +86,13 @@ def test_ct_series_to_colored_ply(tmp_path):
     assert ((points[:, 3:] >= 0) & (points[:, 3:] <= 255)).all()
     assert (points[:, 3:] == points[:, 3:].astype(np.uint8)).all()
     assert tmp_path.stat().st_mode & 0o777 == 0o750
+
+    columns = points[:, 0] / column_spacing
+    rows = points[:, 1] / row_spacing
+    assert ((columns >= 7.5) & (columns <= width - 8.5)
+            & (rows >= 7.5) & (rows <= height - 8.5)).all(), "air voxels were kept"
+    radius = np.hypot(columns - width // 2, rows - height // 2)
+    bone, skin = points[radius <= 6, 3], points[radius >= 10, 3]
+    assert bone.size > 0, "bone is missing from the model"
+    assert skin.size > 0, "skin is missing from the model"
+    assert bone.min() > skin.max(), "bone is not brighter than skin"
