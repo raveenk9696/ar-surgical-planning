@@ -154,25 +154,21 @@ class DcmSequence:
 
     def sort_dcm(self, reverse: bool = False) -> None:
         """
-        Sort the dicoms based on their names in dcm_files.
+        Sort the dicoms by their position along the slice normal. File names
+        do not give the slice order, so they only break ties.
         :param reverse: whether to sort in ascending or descending order.
                         False is ascending. True is descending.
         :return: None
         """
-        # slices = []
-        # skipcount = 0
-        # for f in tqdm.tqdm(self._collection, total=len(self._collection)):
-        #     if hasattr(f, 'SliceLocation'):
-        #         slices.append(f)
-        #     else:
-        #         skipcount = skipcount + 1
-        #
-        # print("Slices with no SliceLocation: {}".format(skipcount))
+        def position(item):
+            name, ds = item
+            if hasattr(ds, "ImagePositionPatient") and hasattr(ds, "ImageOrientationPatient"):
+                row, column = np.asarray(ds.ImageOrientationPatient, dtype=float).reshape(2, 3)
+                normal = np.cross(row, column)
+                return 0, float(normal @ np.asarray(ds.ImagePositionPatient, dtype=float)), name
+            return 1, float(getattr(ds, "InstanceNumber", None) or 0), name
 
-        # ensure they are in the correct order
-        # self._collection = sorted(slices, key=lambda s: s.SliceLocation)
-        zipped = zip(self._dcm_files, self._collection)
-        x = sorted(zipped, reverse=reverse)
+        x = sorted(zip(self._dcm_files, self._collection), key=position, reverse=reverse)
         self._dcm_files = [d for d, c in x]
         self._collection = [c for d, c in x]
 
