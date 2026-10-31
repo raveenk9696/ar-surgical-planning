@@ -41,3 +41,32 @@ export function placeInFront(viewer: Matrix4, m: number): Matrix4 {
   const yaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yawToward(at, eye));
   return new Matrix4().compose(at, yaw, new Vector3(1, 1, 1));
 }
+
+export const CAMERA_FOV_DEG = 28;
+/** Default view: from the front, 24 degrees toward the patient's left, 8 degrees above. */
+export const HOME_AZIMUTH_DEG = 24;
+export const HOME_ELEVATION_DEG = 8;
+
+/**
+ * Camera distance (m) at which the model fills `fill` of the free area's height and at most `maxWidthFill` of its width.
+ * `view` is the whole canvas and `area` the part of it left free of panels, both in CSS px.
+ */
+export function fitDistance(
+  model: { w: number; h: number },
+  view: { w: number; h: number },
+  area: { w: number; h: number },
+  fovDeg: number = CAMERA_FOV_DEG,
+  fill = 0.7,
+  maxWidthFill = 0.92,
+): number {
+  const k = 2 * Math.tan((fovDeg * Math.PI) / 360);
+  const byHeight = (model.h * view.h) / (k * fill * area.h);
+  const byWidth = (model.w * view.h) / (k * maxWidthFill * area.w);
+  return Math.max(byHeight, byWidth);
+}
+
+export function homePosition(distance: number, azimuthDeg = HOME_AZIMUTH_DEG, elevationDeg = HOME_ELEVATION_DEG): Vector3 {
+  const az = (azimuthDeg * Math.PI) / 180;
+  const el = (elevationDeg * Math.PI) / 180;
+  return new Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)).multiplyScalar(distance);
+}

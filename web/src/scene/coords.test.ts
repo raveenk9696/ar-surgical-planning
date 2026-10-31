@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { Matrix4, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import type { Vec3 } from '../types';
-import { lpsDirToRig, lpsToRig, patientMatrix, placeInFront, rigDirToLps, rigToLps, yawToward } from './coords';
+import { fitDistance, homePosition, lpsDirToRig, lpsToRig, patientMatrix, placeInFront, rigDirToLps, rigToLps, yawToward } from './coords';
 
 const world = (v: Vec3): Vector3 => new Vector3(...v).applyMatrix4(patientMatrix);
 
@@ -70,5 +70,31 @@ describe('placeInFront', () => {
   it('turns a model at the origin toward a viewer', () => {
     expect(yawToward(new Vector3(0, 0, 0), new Vector3(0, 0, 3))).toBeCloseTo(0);
     expect(yawToward(new Vector3(0, 0, 0), new Vector3(3, 0, 0))).toBeCloseTo(Math.PI / 2);
+  });
+});
+
+describe('camera framing', () => {
+  it('fills 70% of the height on the desktop canvas: about 1.35 m for the abdomen', () => {
+    const d = fitDistance({ w: 0.352, h: 0.471 }, { w: 1440, h: 900 }, { w: 1028, h: 900 });
+    expect(d).toBeGreaterThan(1.3);
+    expect(d).toBeLessThan(1.4);
+  });
+
+  it('backs off on a portrait phone so the width still fits', () => {
+    const phone = fitDistance({ w: 0.352, h: 0.471 }, { w: 390, h: 844 }, { w: 390, h: 544 });
+    const wide = fitDistance({ w: 0.352, h: 0.471 }, { w: 390, h: 844 }, { w: 390, h: 844 });
+    expect(phone).toBeGreaterThan(wide);
+    const k = 2 * Math.tan((28 * Math.PI) / 360);
+    expect(0.352 / (k * phone * (390 / 844))).toBeLessThanOrEqual(0.92 + 1e-9);
+  });
+
+  it('starts in front of the patient, toward their left and slightly above', () => {
+    const p = homePosition(1.35);
+    expect(p.length()).toBeCloseTo(1.35);
+    expect(p.z).toBeGreaterThan(0);
+    expect(p.x).toBeGreaterThan(0);
+    expect(p.y).toBeGreaterThan(0);
+    expect((Math.atan2(p.x, p.z) * 180) / Math.PI).toBeCloseTo(24);
+    expect((Math.asin(p.y / 1.35) * 180) / Math.PI).toBeCloseTo(8);
   });
 });
