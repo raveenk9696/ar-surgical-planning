@@ -1,3 +1,4 @@
+import { canonicalNote } from './identity';
 import type { Digest, Note } from '../types';
 
 export function fnv32(s: string): number {
@@ -10,9 +11,12 @@ export function fnv32(s: string): number {
 }
 
 export function mergeNote(a: Note | undefined, b: Note): { note: Note; changed: boolean } {
-  if (!a) return { note: b.deleted && b.text ? { ...b, text: '' } : b, changed: true };
-  if (!a.deleted && b.deleted) return { note: { ...a, deleted: true, text: '' }, changed: true };
-  return { note: a, changed: false };
+  if (!a) return { note: b, changed: true };
+  const winner = canonicalNote(a) <= canonicalNote(b) ? a : b;
+  const deletion = a.deletion && b.deletion ? (a.deletion.signature < b.deletion.signature ? a.deletion : b.deletion) : a.deletion ?? b.deletion;
+  const deleted = a.deleted || b.deleted;
+  if (winner === a && deleted === a.deleted && deletion === a.deletion) return { note: a, changed: false };
+  return { note: { ...winner, deleted, deletion }, changed: true };
 }
 
 export function digestOf(notes: Iterable<Note>): Digest {
@@ -20,7 +24,7 @@ export function digestOf(notes: Iterable<Note>): Digest {
   let h = 0;
   for (const note of notes) {
     n++;
-    h = (h ^ fnv32(note.id + (note.deleted ? 'x' : ''))) >>> 0;
+    h = (h ^ fnv32(canonicalNote(note) + (note.deleted ? 'x' : ''))) >>> 0;
   }
   return { n, h };
 }

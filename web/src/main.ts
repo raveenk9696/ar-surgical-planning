@@ -54,8 +54,9 @@ async function copyLink(): Promise<boolean> {
   }
 }
 
-function boot(): void {
-  const self = newPeer();
+async function boot(): Promise<void> {
+  const identity = await newPeer();
+  const self = identity.peer;
   const status = createStatus();
   let newer = false;
   const tabs = createTabsTransport(roomId, { enabled: flags.transport !== 'net' });
@@ -63,7 +64,7 @@ function boot(): void {
   const multi = createMulti(heroTransport ?? tabs);
   const engine = createEngine({
     token,
-    self,
+    identity,
     transport: multi,
     now: Date.now,
     storage: storage(),
@@ -152,7 +153,7 @@ function boot(): void {
 
   people.render(engine.state);
   notesView.render(engine.state, []);
-  engine.start();
+  await engine.start();
   renderStatus();
   hud.setAr('checking');
 
@@ -237,4 +238,4 @@ function showTile(text: string): void {
   byId('btn-reload').addEventListener('click', () => location.reload());
 }
 
-boot();
+void boot().catch(() => showTile('This browser could not create a signing key. Reload to try again.'));

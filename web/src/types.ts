@@ -4,12 +4,16 @@ export type NoteId = string;
 export type Vec3 = readonly [x: number, y: number, z: number];
 export type Mesh = 'bone' | 'skin';
 export interface Peer { id: PeerId; name: string }
+export interface Deletion { id: NoteId; signature: string }
 export interface Note {
+  publicKey: string;
+  signature: string;
+  deletion: Deletion | null;
   id: NoteId;
   pos: Vec3;
   nrm: Vec3;
   mesh: Mesh;
-  /** 1..24 characters, '' once deleted */
+  /** Immutable signed content, including after deletion. */
   text: string;
   author: Peer;
   /** epoch ms, display only */
@@ -17,14 +21,14 @@ export interface Note {
   deleted: boolean;
 }
 export interface Presence { peer: Peer; seq: number; ptr: Vec3 | null; away: boolean; /** local ms, never sent */ seenAt: number }
-/** Record count and XOR of fnv32(id + (deleted ? 'x' : '')). */
+/** Record count and content digest. */
 export interface Digest { n: number; h: number }
 export type Wire =
-  | { v: 1; k: 'hello'; from: Peer; digest: Digest }
-  | { v: 1; k: 'snapshot'; from: PeerId; notes: Note[] }
-  | { v: 1; k: 'note'; from: PeerId; note: Note }
-  | { v: 1; k: 'presence'; from: Peer; seq: number; ptr: Vec3 | null; away: boolean; digest: Digest }
-  | { v: 1; k: 'bye'; from: PeerId };
+  | { v: 2; k: 'hello'; from: Peer; digest: Digest }
+  | { v: 2; k: 'snapshot'; from: PeerId; notes: Note[] }
+  | { v: 2; k: 'note'; from: PeerId; note: Note }
+  | { v: 2; k: 'presence'; from: Peer; seq: number; ptr: Vec3 | null; away: boolean; digest: Digest }
+  | { v: 2; k: 'bye'; from: PeerId };
 export interface LinkStatus { tabs: 'ok' | 'off' | 'unavailable'; net: 'off' | 'connecting' | 'ok' | 'blocked' | 'down' }
 export interface RoomState {
   roomId: string;

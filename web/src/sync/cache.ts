@@ -1,12 +1,12 @@
 import { LIMITS } from '../config';
 import type { Note } from '../types';
-import { decode } from './wire';
+import { decode, verifyWire } from './wire';
 
-const KEY = 'asp:v1:';
+const KEY = 'asp:v2:';
 // decode() wants a sender id; a cached snapshot has no real sender.
 const LOCAL = 'AAAAAAAA';
 
-export function loadCache(roomId: string, s: Pick<Storage, 'getItem'>, now: number): Note[] {
+export async function loadCache(roomId: string, s: Pick<Storage, 'getItem'>, now: number): Promise<Note[]> {
   try {
     const raw = s.getItem(KEY + roomId);
     if (!raw) return [];
@@ -15,8 +15,10 @@ export function loadCache(roomId: string, s: Pick<Storage, 'getItem'>, now: numb
     const { savedAt, notes } = parsed as { savedAt?: unknown; notes?: unknown };
     if (typeof savedAt !== 'number' || !Number.isFinite(savedAt)) return [];
     if (now - savedAt > LIMITS.cacheTtlMs || savedAt > now + LIMITS.cacheTtlMs) return [];
-    const wire = decode({ v: 1, k: 'snapshot', from: LOCAL, notes });
-    return wire?.k === 'snapshot' ? wire.notes : [];
+    const wire = decode({ v: 2, k: 'snapshot', from: LOCAL, notes });
+    if (!wire) return [];
+    const verified = await verifyWire(wire);
+    return verified.k === 'snapshot' ? verified.notes : [];
   } catch {
     return [];
   }

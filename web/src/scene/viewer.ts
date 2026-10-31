@@ -67,12 +67,12 @@ export function createViewer(
   let hoverPin: NoteId | null = null;
 
   const noteInput = createNoteInput({
-    onSubmit(text) {
+    async onSubmit(text) {
       const at = pending;
       closePending();
       deps.onDisarm();
       if (!at) return;
-      const r = deps.engine.addNote({ ...at, text });
+      const r = await deps.engine.addNote({ ...at, text });
       if (r.ok || r.why === 'empty') return;
       const s = deps.engine.state;
       deps.status.toast(r.why === 'rate' ? MESSAGES.rate : liveCount(s.notes) >= LIMITS.maxLive ? MESSAGES.roomFull : MESSAGES.ownFull);

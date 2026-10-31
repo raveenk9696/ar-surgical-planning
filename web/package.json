@@ -23,6 +23,7 @@
     "three-mesh-bvh": "0.9.17"
   },
   "devDependencies": {
+    "@types/node": "24.10.0",
     "@types/three": "0.187.0",
     "@vitejs/plugin-basic-ssl": "2.3.0",
     "fast-check": "4.10.2",

@@ -3,7 +3,7 @@ import { FakeHub } from '../test/fakehub';
 import type { Wire } from '../types';
 import { createMulti } from './multi';
 
-const bye: Wire = { v: 1, k: 'bye', from: 'AAAAAAAA' };
+const bye: Wire = { v: 2, k: 'bye', from: 'AAAAAAAA' };
 
 describe('createMulti', () => {
   it('sends to every transport and merges what they receive and report', () => {

@@ -1,3 +1,4 @@
+import { newPeer, signNote } from '../sync/identity';
 import { Raycaster, Vector3 } from 'three';
 import { createSignal, type Link, type StatusUpdate, type Transport } from '../net/transport';
 import type { Engine } from '../sync/engine';
@@ -9,7 +10,6 @@ import type { Note, Peer, Vec3, Wire } from '../types';
 
 export type HeroMode = 'model' | 'together';
 
-const GUEST: Peer = { id: 'GUESTTWO', name: 'Guest 2' };
 // Anatomy points as LPS millimetres on the front of the scan. The probe finds the bone surface under each.
 const LEFT_HIP = { x: 70, z: -435 };
 const RIGHT_ILIAC = { x: -100, z: -330 };
@@ -38,11 +38,14 @@ export function probeFront(model: ModelHandle, x: number, z: number): Hit | null
 }
 
 function noteAt(id: string, text: string, hit: Hit, author: Peer): Note {
-  return { id, pos: hit.pos, nrm: hit.nrm, mesh: hit.mesh, text, author, created: Date.now(), deleted: false };
+  return { publicKey: '', signature: '', deletion: null, id, pos: hit.pos, nrm: hit.nrm, mesh: hit.mesh, text, author, created: Date.now(), deleted: false };
 }
 
-export function applyHero(mode: HeroMode, h: { viewer: Viewer; engine: Engine; transport: Pick<Transport & { inject(w: Wire): void }, 'inject'>; model: ModelHandle }): boolean {
+export async function applyHero(mode: HeroMode, h: { viewer: Viewer; engine: Engine; transport: Pick<Transport & { inject(w: Wire): void }, 'inject'>; model: ModelHandle }): Promise<boolean> {
   const { viewer, engine, transport, model } = h;
+  const guest = await newPeer();
+  guest.peer.name = 'Guest 2';
+  const GUEST = guest.peer;
   document.body.classList.add(`hero-${mode}`);
   viewer.layout();
   if (mode === 'model') {
@@ -57,7 +60,7 @@ export function applyHero(mode: HeroMode, h: { viewer: Viewer; engine: Engine; t
   const ptr = probeFront(model, POINTER.x, POINTER.z);
   if (!pin || !ptr) return false;
   const presence = (jitter: number): Wire => ({
-    v: 1,
+    v: 2,
     k: 'presence',
     from: GUEST,
     seq: Math.floor(performance.now()),
@@ -65,7 +68,7 @@ export function applyHero(mode: HeroMode, h: { viewer: Viewer; engine: Engine; t
     away: false,
     digest: { n: 1, h: 0 },
   });
-  transport.inject({ v: 1, k: 'note', from: GUEST.id, note: noteAt('GUESTTWO.1', 'look here', pin, GUEST) });
+  transport.inject({ v: 2, k: 'note', from: GUEST.id, note: await signNote(noteAt(`${GUEST.id}.1`, 'look here', pin, GUEST), guest) });
   // The pointer fades after 3 s without movement, so it nudges a hair every second to stay on screen for the capture.
   let flip = 1;
   transport.inject(presence(0));

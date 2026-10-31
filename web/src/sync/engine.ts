@@ -1,11 +1,12 @@
 import { LIMITS } from '../config';
 import type { Link, Transport } from '../net/transport';
 import type { AddResult, Digest, Mesh, Note, NoteId, Peer, PeerId, Presence, RoomState, Vec3, Wire } from '../types';
+import { signNote, signDeletion, type Identity } from './identity';
 import { loadCache, saveCache } from './cache';
 import { createLimiter } from './limiter';
 import { digestOf, mergeNote } from './notes';
 import { split } from './roomId';
-import { decode, isNewerVersion, isSafeText } from './wire';
+import { decode, verifyWire, isNewerVersion, isSafeText } from './wire';
 
 const HELLO_AT_MS = [1000, 3000, 7000];
 const CACHE_DEBOUNCE_MS = 500;
@@ -16,11 +17,11 @@ export interface Changes { notes: NoteId[]; peers: boolean; link: boolean }
 export interface Engine {
   readonly state: RoomState;
   subscribe(fn: (s: RoomState, c: Changes) => void): () => void;
-  addNote(i: { pos: Vec3; nrm: Vec3; mesh: Mesh; text: string }): AddResult;
-  deleteNote(id: NoteId): void;
+  addNote(i: { pos: Vec3; nrm: Vec3; mesh: Mesh; text: string }): Promise<AddResult>;
+  deleteNote(id: NoteId): Promise<void>;
   setPointer(p: Vec3 | null): void;
   setAway(a: boolean): void;
-  start(): void;
+  start(): Promise<void>;
   stop(): void;
 }
 
@@ -72,11 +73,11 @@ function touch(peers: ReadonlyMap<PeerId, Presence>, id: PeerId, now: number): R
 }
 
 function hello(s: RoomState): Wire {
-  return { v: 1, k: 'hello', from: s.self, digest: digestOfMap(s.notes) };
+  return { v: 2, k: 'hello', from: s.self, digest: digestOfMap(s.notes) };
 }
 
 function snapshot(s: RoomState): Wire {
-  return { v: 1, k: 'snapshot', from: s.self.id, notes: Array.from(s.notes.values()) };
+  return { v: 2, k: 'snapshot', from: s.self.id, notes: Array.from(s.notes.values()) };
 }
 
 /** Applies one inbound message. Pure: rate limits and echo checks belong to the caller. */
@@ -136,14 +137,15 @@ const senderOf = (w: Wire): PeerId => (w.k === 'hello' || w.k === 'presence' ? w
 
 export function createEngine(o: {
   token: string;
-  self: Peer;
+  identity: Identity;
   transport: Transport;
   now: () => number;
   storage?: Storage;
   timers?: Pick<typeof globalThis, 'setInterval' | 'clearInterval'>;
   onNewerVersion?: () => void;
 }): Engine {
-  const { self, transport, now } = o;
+  const { identity, transport, now } = o;
+  const self = identity.peer;
   const { roomId } = split(o.token);
   const timers = o.timers ?? globalThis;
   const tickMs = Math.round(1000 / LIMITS.presenceHz);
@@ -162,6 +164,14 @@ export function createEngine(o: {
   const cleanups: Array<() => void> = [];
   let timer: ReturnType<typeof globalThis.setInterval> | undefined;
   let running = false;
+  let generation = 0;
+  let pendingVerifications = 0;
+  let localTail: Promise<unknown> = Promise.resolve();
+  function serialize<T>(op: () => Promise<T>): Promise<T> {
+    const next = localTail.then(op);
+    localTail = next.catch(() => undefined);
+    return next;
+  }
   let startedAt = 0;
   let helloIndex = 0;
   let counter = 0;
@@ -207,7 +217,7 @@ export function createEngine(o: {
   function sendPresence(): void {
     lastPresenceAt = now();
     ptrDirty = false;
-    send({ v: 1, k: 'presence', from: self, seq: ++seq, ptr: away ? null : ptr, away, digest: digestOfMap(state.notes) });
+    send({ v: 2, k: 'presence', from: self, seq: ++seq, ptr: away ? null : ptr, away, digest: digestOfMap(state.notes) });
   }
 
   function flushCache(): void {
@@ -240,12 +250,36 @@ export function createEngine(o: {
     }
     const from = senderOf(msg);
     if (from === self.id || !all.take('all')) return;
+    const signed = msg.k === 'note' || msg.k === 'snapshot';
     const bound = identities.get(from);
-    if (bound && bound.link !== link) return;
-    if (link !== 'tab' && linkPeers.has(link) && linkPeers.get(link) !== from) return;
+    // Presence is unsigned. Link binding limits spoofing of pointers, which cannot change notes.
+    if (!signed && bound && bound.link !== link) {
+      if (now() - bound.seenAt < 5000) return;
+      unbind(from);
+      if (state.peers.has(from)) {
+        const peers = new Map(state.peers);
+        peers.delete(from);
+        commit({ ...state, peers });
+      }
+    }
+    if (!signed && link !== 'tab' && linkPeers.has(link) && linkPeers.get(link) !== from) return;
     if (msg.k !== 'bye' && !perLink[msg.k].take(link)) return;
-    identities.set(from, { link, seenAt: now() });
-    if (link !== 'tab') linkPeers.set(link, from);
+    if (!signed) {
+      identities.set(from, { link, seenAt: now() });
+      if (link !== 'tab') linkPeers.set(link, from);
+    }
+    if (signed) {
+      if (pendingVerifications >= 32) return;
+      pendingVerifications++;
+      const epoch = generation;
+      void verifyWire(msg).then((verified) => {
+        if (running && epoch === generation) accept(verified, link);
+      }).finally(() => { pendingVerifications--; });
+    } else accept(msg, link);
+  }
+
+  function accept(msg: Wire, link: Link): void {
+    const from = senderOf(msg);
     const t = now();
     let accepted = msg;
     if (msg.k === 'note' || msg.k === 'snapshot') {
@@ -285,7 +319,7 @@ export function createEngine(o: {
 
   function localNote(note: Note): void {
     commit({ ...state, notes: mergeNotes(state.notes, [note]) });
-    send({ v: 1, k: 'note', from: self.id, note });
+    send({ v: 2, k: 'note', from: self.id, note });
     cacheDirtyAt ??= now();
   }
 
@@ -297,7 +331,7 @@ export function createEngine(o: {
       subs.add(fn);
       return () => void subs.delete(fn);
     },
-    addNote(i) {
+    addNote(i) { return serialize(async () => {
       const normalized = i.text.normalize('NFKC');
       if (!isSafeText(normalized)) return { ok: false, why: 'empty' };
       const text = normalized.replace(/\s+/g, ' ').trim().slice(0, LIMITS.textMax);
@@ -308,13 +342,13 @@ export function createEngine(o: {
       }
       if (!ownNotes.take('self')) return { ok: false, why: 'rate' };
       const id = `${self.id}.${++counter}`;
-      localNote({ id, pos: i.pos, nrm: i.nrm, mesh: i.mesh, text, author: self, created: now(), deleted: false });
+      localNote(await signNote({ publicKey: identity.publicKey, signature: '', deletion: null, id, pos: i.pos, nrm: i.nrm, mesh: i.mesh, text, author: self, created: now(), deleted: false }, identity));
       return { ok: true, id };
-    },
-    deleteNote(id) {
+    }); },
+    deleteNote(id) { return serialize(async () => {
       const n = state.notes.get(id);
-      if (n && n.author.id === self.id && !n.deleted) localNote({ ...n, deleted: true, text: '' });
-    },
+      if (n && n.author.id === self.id && !n.deleted) localNote({ ...n, deleted: true, deletion: await signDeletion(id, identity) });
+    }); },
     setPointer(p) {
       if (p === ptr || (p && ptr && p[0] === ptr[0] && p[1] === ptr[1] && p[2] === ptr[2])) return;
       ptr = p;
@@ -328,9 +362,15 @@ export function createEngine(o: {
       if (!a) sendHello();
       sendPresence();
     },
-    start() {
+    async start() {
       if (running) return;
       running = true;
+      const epoch = ++generation;
+      if (o.storage) {
+        const cached = await loadCache(roomId, o.storage, now());
+        if (!running || epoch !== generation) return;
+        commit({ ...state, notes: mergeNotes(state.notes, cached) });
+      }
       startedAt = now();
       cleanups.push(transport.onMessage(inbound), transport.onStatus((st) => {
         const { peers, ...link } = st;
@@ -338,14 +378,14 @@ export function createEngine(o: {
         commit({ ...state, link: changed ? { ...state.link, ...link } : state.link, netPeers: peers ?? state.netPeers });
       }), transport.onPeerJoin(sendHello));
       transport.open();
-      if (o.storage) commit({ ...state, notes: mergeNotes(state.notes, loadCache(roomId, o.storage, now())) });
       sendHello();
       timer = timers.setInterval(tick, tickMs);
     },
     stop() {
       if (!running) return;
       running = false;
-      send({ v: 1, k: 'bye', from: self.id });
+      generation++;
+      send({ v: 2, k: 'bye', from: self.id });
       if (cacheDirtyAt !== null) flushCache();
       if (timer !== undefined) timers.clearInterval(timer);
       for (const off of cleanups.splice(0)) off();

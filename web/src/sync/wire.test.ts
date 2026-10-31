@@ -4,16 +4,16 @@ import type { Note, Wire } from '../types';
 import { decode, isNewerVersion } from './wire';
 
 const peer = { id: 'AAAAAAAA', name: 'Guest 2' };
-const note: Note = { id: 'AAAAAAAA.1', pos: [10, -20, -300], nrm: [0, -1, 0], mesh: 'bone', text: 'left hip', author: peer, created: 1_700_000_000_000, deleted: false };
+const note: Note = { id: 'AAAAAAAA.1', pos: [10, -20, -300], nrm: [0, -1, 0], mesh: 'bone', text: 'left hip', author: peer, created: 1_700_000_000_000, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
 const digest = { n: 1, h: 123 };
 const valid: Wire[] = [
-  { v: 1, k: 'hello', from: peer, digest },
-  { v: 1, k: 'snapshot', from: 'AAAAAAAA', notes: [note] },
-  { v: 1, k: 'note', from: 'AAAAAAAA', note },
-  { v: 1, k: 'note', from: 'AAAAAAAA', note: { ...note, text: '', deleted: true } },
-  { v: 1, k: 'presence', from: peer, seq: 4, ptr: [1, 2, 3], away: false, digest },
-  { v: 1, k: 'presence', from: peer, seq: 0, ptr: null, away: true, digest },
-  { v: 1, k: 'bye', from: 'AAAAAAAA' },
+  { v: 2, k: 'hello', from: peer, digest },
+  { v: 2, k: 'snapshot', from: 'AAAAAAAA', notes: [note] },
+  { v: 2, k: 'note', from: 'AAAAAAAA', note },
+  { v: 2, k: 'note', from: 'AAAAAAAA', note: { ...note, deleted: true, deletion: { id: note.id, signature: 'A'.repeat(86) } } },
+  { v: 2, k: 'presence', from: peer, seq: 4, ptr: [1, 2, 3], away: false, digest },
+  { v: 2, k: 'presence', from: peer, seq: 0, ptr: null, away: true, digest },
+  { v: 2, k: 'bye', from: 'AAAAAAAA' },
 ];
 
 const clone = (w: unknown): Record<string, unknown> => JSON.parse(JSON.stringify(w)) as Record<string, unknown>;
@@ -29,13 +29,13 @@ describe('decode', () => {
     ['a string', 'hello'],
     ['an array', [1, 2]],
     ['a number', 7],
-    ['wrong version', { ...clone(valid[6]), v: 2 }],
+    ['wrong version', { ...clone(valid[6]), v: 3 }],
     ['no version', { k: 'bye', from: 'AAAAAAAA' }],
-    ['unknown kind', { v: 1, k: 'nope', from: 'AAAAAAAA' }],
+    ['unknown kind', { v: 2, k: 'nope', from: 'AAAAAAAA' }],
     ['extra key', { ...clone(valid[6]), extra: 1 }],
-    ['__proto__ key', JSON.parse('{"v":1,"k":"bye","from":"AAAAAAAA","__proto__":{"x":1}}')],
+    ['__proto__ key', JSON.parse('{"v":2,"k":"bye","from":"AAAAAAAA","__proto__":{"x":1}}')],
     ['constructor key', { ...clone(valid[6]), constructor: 1 }],
-    ['bad peer id', { v: 1, k: 'bye', from: 'short' }],
+    ['bad peer id', { v: 2, k: 'bye', from: 'short' }],
     ['NaN coordinate', withNote({ pos: [Number.NaN, 0, 0] })],
     ['Infinity coordinate', withNote({ pos: [Number.POSITIVE_INFINITY, 0, 0] })],
     ['1e9 mm', withNote({ pos: [1e9, 0, 0] })],
@@ -58,7 +58,7 @@ describe('decode', () => {
   });
 
   it('rejects a snapshot of 301 notes and accepts 300', () => {
-    const many = (n: number): unknown => ({ v: 1, k: 'snapshot', from: 'AAAAAAAA', notes: Array.from({ length: n }, (_, i) => ({ ...clone(note), id: `AAAAAAAA.${i + 1}` })) });
+    const many = (n: number): unknown => ({ v: 2, k: 'snapshot', from: 'AAAAAAAA', notes: Array.from({ length: n }, (_, i) => ({ ...clone(note), id: `AAAAAAAA.${i + 1}` })) });
     expect(decode(many(301))).toBeNull();
     expect(decode(many(300))).not.toBeNull();
   });
@@ -87,8 +87,8 @@ describe('decode', () => {
 
 describe('isNewerVersion', () => {
   it('flags only well-shaped messages from a later version', () => {
-    expect(isNewerVersion({ v: 2, k: 'hello' })).toBe(true);
-    expect(isNewerVersion({ v: 1, k: 'hello' })).toBe(false);
+    expect(isNewerVersion({ v: 3, k: 'hello' })).toBe(true);
+    expect(isNewerVersion({ v: 2, k: 'hello' })).toBe(false);
     expect(isNewerVersion({ v: 3 })).toBe(false);
     expect(isNewerVersion('x')).toBe(false);
   });
@@ -96,5 +96,5 @@ describe('isNewerVersion', () => {
 
 it.each(['\u200B', '\u202E', '\u2066', '\u2028', '\u2029', 'ｈｉｐ'])('rejects unsafe or non-normalized note text %j', (text) => {
   expect(decode(withNote({ text }))).toBeNull();
-  expect(decode({ v: 1, k: 'snapshot', from: peer.id, notes: [{ ...note, text }] })).toBeNull();
+  expect(decode({ v: 2, k: 'snapshot', from: peer.id, notes: [{ ...note, text }] })).toBeNull();
 });

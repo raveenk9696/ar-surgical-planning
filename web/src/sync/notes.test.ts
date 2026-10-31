@@ -20,7 +20,7 @@ const noteArb: fc.Arbitrary<Note> = fc
   })
   .map(({ a, n, pos, mesh, text, created, deleted }) => {
     const author = AUTHORS[a] ?? AUTHORS[0]!;
-    return { id: `${author.id}.${n}`, pos, nrm: [0, 0, 1], mesh, text: deleted ? '' : text, author, created, deleted };
+    return { id: `${author.id}.${n}`, pos, nrm: [0, 0, 1], mesh, text, author, created, deleted, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
   });
 
 const fold = (notes: Note[]): Map<string, Note> => {
@@ -30,7 +30,7 @@ const fold = (notes: Note[]): Map<string, Note> => {
 };
 
 const sameId = fc.tuple(noteArb, fc.boolean(), fc.boolean(), fc.boolean()).map(([base, ...flags]) =>
-  flags.map((deleted) => ({ ...base, deleted, text: deleted ? '' : 'hip' })) as [Note, Note, Note],
+  flags.map((deleted) => ({ ...base, deleted, text: 'hip' })) as [Note, Note, Note],
 );
 
 describe('mergeNote', () => {
@@ -75,29 +75,29 @@ describe('mergeNote', () => {
   });
 
   it('keeps a tombstone that arrives before its create', () => {
-    const create: Note = { id: 'AAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false };
-    const tomb: Note = { ...create, text: '', deleted: true };
+    const create: Note = { id: 'AAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
+    const tomb: Note = { ...create, deleted: true };
     const first = mergeNote(undefined, tomb).note;
     const after = mergeNote(first, create);
     expect(after.note.deleted).toBe(true);
-    expect(after.note.text).toBe('');
+    expect(after.note.text).toBe('hip');
     expect(after.changed).toBe(false);
   });
 
-  it('keeps the first immutable fields and ORs conflicting tombstones', () => {
-    const a: Note = { id: 'AAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false };
+  it('chooses immutable fields deterministically and ORs conflicting tombstones', () => {
+    const a: Note = { id: 'AAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
     const b: Note = { ...a, pos: [9, 9, 9], text: 'rib' };
     expect(mergeNote(a, b).note).toBe(a);
-    expect(mergeNote(b, a).note).toBe(b);
+    expect(mergeNote(b, a).note).toEqual(a);
     expect(mergeNote(a, { ...b, text: 'aaa' }).note.text).toBe('hip');
-    const tomb = { ...b, deleted: true, text: '' };
-    expect(mergeNote(tomb, a).note).toEqual(tomb);
-    expect(mergeNote(a, tomb).note).toEqual({ ...a, deleted: true, text: '' });
+    const tomb = { ...b, deleted: true };
+    expect(mergeNote(tomb, a).note).toEqual({ ...a, deleted: true });
+    expect(mergeNote(a, tomb).note).toEqual({ ...a, deleted: true });
   });
 
   it('does not let a stale live copy resurrect a deleted note', () => {
-    const live: Note = { id: 'AAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false };
-    const dead = mergeNote(live, { ...live, text: '', deleted: true }).note;
+    const live: Note = { id: 'AAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
+    const dead = mergeNote(live, { ...live, deleted: true }).note;
     expect(mergeNote(dead, live).note.deleted).toBe(true);
   });
 });
@@ -110,8 +110,8 @@ describe('digestOf', () => {
         expect(digestOf(unique)).toEqual(digestOf([...unique].reverse()));
       }),
     );
-    const n: Note = { id: 'AAAAAAAA.1', pos: [0, 0, 0], nrm: [0, 0, 1], mesh: 'bone', text: 'a', author: AUTHORS[0]!, created: 1, deleted: false };
-    expect(digestOf([n])).not.toEqual(digestOf([{ ...n, deleted: true, text: '' }]));
+    const n: Note = { id: 'AAAAAAAA.1', pos: [0, 0, 0], nrm: [0, 0, 1], mesh: 'bone', text: 'a', author: AUTHORS[0]!, created: 1, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
+    expect(digestOf([n])).not.toEqual(digestOf([{ ...n, deleted: true }]));
     expect(digestOf([])).toEqual({ n: 0, h: 0 });
   });
 });
