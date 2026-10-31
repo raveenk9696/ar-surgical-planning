@@ -167,3 +167,25 @@ def test_left_marker_has_larger_patient_x_with_oblique_orientation(tmp_path):
     assert left[:, 0].min() > right[:, 0].max()
     np.testing.assert_allclose(left[:, 0].max(), 86, atol=1e-4)
     assert points[:, 2].min() == 300
+
+
+def test_table_is_removed_and_body_is_kept(tmp_path):
+    write_series(tmp_path, [f"{z}.dcm" for z in range(DEPTH)])
+    for file in tmp_path.glob("*.dcm"):
+        ds = pydicom.dcmread(file)
+        pixels = ds.pixel_array.copy()
+        pixels[59:61, :] = 100
+        ds.PixelData = pixels.tobytes()
+        ds.save_as(file, enforce_file_format=True)
+    points = run_pipeline(tmp_path)[1]
+    assert np.all(points[:, 1] < 58 * ROW_SPACING)
+    assert np.any(points[:, 3] == 255)
+    assert np.any(points[:, 3] == 127)
+
+
+def test_point_budget_is_deterministic(tmp_path):
+    write_series(tmp_path, [f"{z}.dcm" for z in range(DEPTH)])
+    first = run_pipeline(tmp_path, 0.1, "--max-points", 1200)[1]
+    assert 0 < len(first) <= 1200
+    np.testing.assert_array_equal(first, run_pipeline(tmp_path, 0.1, "--max-points", 1200)[1])
+    assert np.any(first[:, 3] == 255)

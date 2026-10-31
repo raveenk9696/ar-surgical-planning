@@ -11,7 +11,9 @@ if __name__ == "__main__":
     parser.add_argument("interp_factor", type=float, help="Additional slices per mm of stack depth")
     parser.add_argument("--threshold-hu", type=float, default=-500,
                         help="Keep samples at or above this HU value (default -500, drops air and keeps skin)")
+    parser.add_argument("--max-points", type=int, default=2_000_000,
+                        help="Maximum exported points with fixed-seed sampling (default 2000000)")
     args = parser.parse_args()
     start = time.perf_counter()
-    count = convertor(args.path, args.interp_factor, args.threshold_hu)
+    count = convertor(args.path, args.interp_factor, args.threshold_hu, args.max_points)
     print(f"Wrote {count} points in {time.perf_counter() - start:.2f} s")
