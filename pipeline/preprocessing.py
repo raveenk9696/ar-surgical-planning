@@ -141,7 +141,7 @@ def interpolate_imgs2vol(volume: np.ndarray, num_slices: int = 4) -> np.ndarray:
 
     # get slices with separation of 1/(num_slices + 1)
     g = np.mgrid[1:num_slices + 1, :img_height, :img_width]
-    coords = np.vstack(map(np.ravel, g)).transpose().astype(np.float16)
+    coords = np.vstack(list(map(np.ravel, g))).transpose().astype(np.float16)
     coords[:, 0] *= 1 / (num_slices + 1)
 
     stack = np.zeros((depth + num_slices * (depth - 1), img_height, img_width), dtype=np.uint8)
@@ -247,7 +247,7 @@ def interpolate_dcm2vol(dcm_list: List[pydicom.dataset.FileDataset],
         # Conduct interpolation with constant 4 slices between
         # get slices with desired separation
         g = np.mgrid[1:5, :img_height, :img_width]  # 4 slices between (5 - 1)
-        coords = np.vstack(map(np.ravel, g)).transpose().astype(np.float16)  # [z, y, x] between 2 slices
+        coords = np.vstack(list(map(np.ravel, g))).transpose().astype(np.float16)  # [z, y, x] between 2 slices
         coords[:, 0] *= 1 / 5  # scale to be properly between the slices
 
         # final interpolated volume but empty
@@ -273,7 +273,7 @@ def interpolate_dcm2vol(dcm_list: List[pydicom.dataset.FileDataset],
         # Conduct interpolation with spacing between slices. Is constant for one image sequence
         # get slices with desired separation
         g = np.mgrid[1:(num_slices + 1), :img_height, :img_width]  # 4 slices between (5 - 1)
-        coords = np.vstack(map(np.ravel, g)).transpose().astype(np.float16)  # [z, y, x] between 2 slices
+        coords = np.vstack(list(map(np.ravel, g))).transpose().astype(np.float16)  # [z, y, x] between 2 slices
         coords[:, 0] *= 1 / (num_slices + 1)  # scale to be properly between the slices
 
         for i in range(depth):
