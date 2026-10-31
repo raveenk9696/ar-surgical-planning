@@ -15,15 +15,17 @@ whole-stack interpolation, triangle limits, skin cropping, and manifest integrit
 Use the environment above for these commands.
 
 ```sh
-python pipeline/fetch_sample.py abdomen --data-dir /tmp/ar-samples
-python pipeline/main.py /tmp/ar-samples/abdomen 0.1 --threshold-hu -500 --max-points 2000000
-python pipeline/surfaces.py /tmp/ar-samples/abdomen /tmp/abdomen.glb --crop-z-min -350
+/tmp/ar-pipeline-test/bin/python pipeline/fetch_sample.py abdomen --data-dir /tmp/ar-samples
+/tmp/ar-pipeline-test/bin/python pipeline/main.py /tmp/ar-samples/abdomen 0.1 --threshold-hu -500 --max-points 2000000
+/tmp/ar-pipeline-test/bin/python pipeline/surfaces.py /tmp/ar-samples/abdomen /tmp/abdomen.glb --crop-z-min -350
 ```
 
 The point cloud is `/tmp/ar-samples/abdomen/DCMPLY/generated.ply`.
-`fetch_sample.py legs` selects the second public sample.
-For this legs series, a skin crop at LPS z 900 mm removes the groin and leaves a short upper skin section.
+`/tmp/ar-pipeline-test/bin/python pipeline/fetch_sample.py legs` selects the second public sample.
+For this legs series, the skin crop at LPS z 900 mm still leaves groin tissue.
+Share only the legs bone mesh. Do not share its skin, combined GLB, or uncropped point cloud.
 Bone is not cropped. Review crops for each new series.
+Only `abdomen.glb` feeds the web app.
 
 The volume is `(Z, H, W)` float32 HU with a voxel-index to DICOM LPS-mm affine.
 The affine maps `(slice, row, column)` to `(left, posterior, superior)` patient coordinates.
@@ -35,3 +37,11 @@ GLBs contain named `bone` and `skin` meshes in LPS mm and provenance in scene ex
 
 Keep scans, models, renders, and patient headers outside Git.
 See `pipeline/validation.md` for the public-scan results.
+
+## Publish checklist
+
+- Confirm that each contributor's permission covers the MIT license.
+- Create the repository and publish the reviewed history on `main`. Make `main` the default branch. Keep the history intact so the README's commit references still resolve.
+- In Settings > Pages, set Source to GitHub Actions.
+- Before announcing the site, check that the repository and demo links in the root README return HTTP 200.
+- Check that the weekly workflow stays enabled. [GitHub disables scheduled workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule) in public repositories after 60 days without repository activity.
