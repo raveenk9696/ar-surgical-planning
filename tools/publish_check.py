@@ -12,12 +12,12 @@ import subprocess
 import sys
 
 MAX_BYTES = 5 * 1024 * 1024
-IMAGE_SUFFIXES = (".dcm", ".ima", ".nii", ".nii.gz", ".nrrd", ".mha", ".mhd", ".ply", ".obj", ".stl")
+IMAGE_SUFFIXES = (".dcm", ".ima", ".nii", ".nii.gz", ".nrrd", ".mha", ".mhd", ".ply", ".obj", ".stl",
+                  ".glb", ".gltf", ".fbx", ".usdz", ".3mf", ".vrm")
 BANNED_DIRS = ("node_modules/", "__pycache__/")
 DICOM_FIRST_ELEMENTS = (b"\x02\x00\x00\x00", b"\x08\x00\x05\x00", b"\x08\x00\x08\x00", b"\x08\x00\x16\x00", b"\x08\x00\x18\x00")
 OBJ_VERTEX = re.compile(rb"^v -?\d", re.MULTILINE)
 LOCAL_PATH = re.compile(rb"/Users/[A-Za-z]|C:\\\\?Users\\\\?[A-Za-z]")
-NOREPLY = ("@users.noreply.github.com", "noreply@github.com")
 
 
 def git(repo, *args, check=True):
@@ -50,7 +50,7 @@ def looks_like_dicom(content):
 
 
 def looks_like_model(content):
-    return content.startswith((b"ply\n", b"ply\r\n", b"solid ")) or len(OBJ_VERTEX.findall(content[:65536])) >= 50
+    return content.startswith((b"ply\n", b"ply\r\n", b"solid ", b"glTF")) or len(OBJ_VERTEX.findall(content[:65536])) >= 50
 
 
 def blob_problems(repo):
@@ -74,7 +74,7 @@ def history_problems(repo):
     emails = set(git(repo, "log", "--all", "--format=%ae%n%ce").split())
     emails |= set(re.findall(r"<([^>]+)>", git(repo, "log", "--all", "--format=%(trailers:valueonly)")))
     for email in sorted(emails):
-        if not email.endswith(NOREPLY):
+        if email != "noreply@github.com" and not email.endswith("@users.noreply.github.com"):
             yield f"privacy: personal email in commit metadata: {email}"
 
 
@@ -89,7 +89,7 @@ def head_problems(repo):
 def secret_problems(repo):
     if shutil.which("gitleaks") is None:
         yield "secrets: gitleaks is not installed, so secrets were not checked"
-    elif subprocess.run(["gitleaks", "git", repo, "--redact", "--no-banner", "--log-level", "error"]).returncode:
+    elif subprocess.run(["gitleaks", "git", repo, "--redact", "--verbose", "--no-banner", "--log-level", "error"]).returncode:
         yield "secrets: gitleaks found secrets in the history (output above)"
 
 
