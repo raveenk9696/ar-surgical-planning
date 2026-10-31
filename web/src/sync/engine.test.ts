@@ -341,19 +341,23 @@ describe('reduce', () => {
 });
 
 describe('mergeNotes caps', () => {
-  it('stops at 100 live notes and 20 per author', () => {
+  it('merges remote records beyond local creation caps', () => {
     const incoming: Note[] = [];
     for (const c of 'BCDEFG') for (let n = 1; n <= 25; n++) incoming.push(noteBy(c, n));
     const notes = mergeNotes(new Map(), incoming);
-    expect(notes.size).toBe(100);
-    for (const c of 'BCDEF') expect([...notes.values()].filter((n) => n.author.id === c.repeat(8))).toHaveLength(20);
+    expect(notes.size).toBe(150);
+    for (const c of 'BCDEFG') expect([...notes.values()].filter((n) => n.author.id === c.repeat(8))).toHaveLength(25);
   });
 
   it('stops at 300 records, counting tombstones, but still applies deletes', () => {
     const tombs = Array.from({ length: 320 }, (_, i) => noteBy('B', i + 1, { deleted: true, text: '' }));
     const full = mergeNotes(new Map(), tombs);
     expect(full.size).toBe(300);
-    expect(mergeNotes(full, [noteBy('C', 1)])).toBe(full);
+    const incoming = noteBy('C', 1);
+    const merged = mergeNotes(full, [incoming]);
+    expect(merged.size).toBe(300);
+    expect(merged.has(incoming.id)).toBe(true);
+    expect(merged.has('BBBBBBBB.300')).toBe(false);
   });
 
   it('applies a delete to a stored note', () => {
@@ -474,4 +478,50 @@ it.each(['\u200B', '\u202E', '\u2066', '\u2028', '\u2029', '\u0000'])('rejects l
   const a = mk(new FakeHub(), 'A');
   expect(add(a.engine, `a${ch}b`).ok).toBe(false);
   expect(a.engine.state.notes.size).toBe(0);
+});
+
+
+it('converges three replicas after concurrent adds at 99 notes with loss, duplicates and reorder', () => {
+  const seed: Note[] = [];
+  for (const c of 'DEFGH') for (let i = 1; i <= 20; i++) seed.push(noteBy(c, i));
+  seed.pop();
+  const storage: Storage = { getItem: () => JSON.stringify({ savedAt: Date.now(), notes: seed }), setItem: vi.fn(), removeItem: vi.fn(), clear: vi.fn(), key: () => null, length: 1 };
+  const hub = new FakeHub();
+  const replicas = ['A', 'B', 'C'].map((c) => mk(hub, c, { storage }));
+  hub.cut('A', 'B'); hub.cut('A', 'C'); hub.cut('B', 'C');
+  for (const { engine } of replicas) {
+    engine.start();
+    expect(engine.state.notes.size).toBe(99);
+    expect(add(engine).ok).toBe(true);
+    expect(add(engine)).toEqual({ ok: false, why: 'full' });
+  }
+  hub.duplicate = true;
+  hub.dropEvery = 3;
+  let delivery = 0;
+  hub.delayMs = () => (++delivery % 2 ? 90 : 1);
+  hub.heal();
+  run(30_000);
+  hub.dropEvery = 0;
+  run(12_000);
+  for (const { engine } of replicas) {
+    expect(engine.state.notes.size).toBe(102);
+    expect(digestOf(engine.state.notes.values())).toEqual(digestOf(replicas[0]!.engine.state.notes.values()));
+    engine.stop();
+  }
+});
+
+it('keeps the same 300 records regardless of union order and notifies about evicted pins', () => {
+  const notes = Array.from({ length: 301 }, (_, i) => noteBy('B', i + 1, { created: 1, deleted: true, text: '' }));
+  expect(mergeNotes(new Map(), notes)).toEqual(mergeNotes(new Map(), [...notes].reverse()));
+  const a = mk(new FakeHub(), 'A');
+  a.engine.start();
+  a.end.inject({ v: 1, k: 'snapshot', from: peer('B').id, notes: notes.slice(0, 300) });
+  const changes: string[] = [];
+  a.engine.subscribe((_s, c) => changes.push(...c.notes));
+  const before = new Set(a.engine.state.notes.keys());
+  a.end.inject({ v: 1, k: 'note', from: peer('C').id, note: noteBy('C', 1, { created: 0 }) });
+  expect(a.engine.state.notes.has('CCCCCCCC.1')).toBe(true);
+  const evicted = [...before].find((id) => !a.engine.state.notes.has(id));
+  expect(evicted).toBeDefined();
+  expect(changes).toContain(evicted);
 });

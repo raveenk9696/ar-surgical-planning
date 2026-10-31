@@ -45,26 +45,18 @@ export function mergeNotes(notes: ReadonlyMap<NoteId, Note>, incoming: readonly 
   for (const note of incoming) {
     const base = next ?? notes;
     const prev = base.get(note.id);
-    if (!prev && !fits(base, note)) continue;
     const merged = mergeNote(prev, note);
     if (!merged.changed) continue;
     next ??= new Map(notes);
     next.set(note.id, merged.note);
   }
-  return next ?? notes;
-}
-
-function fits(notes: ReadonlyMap<NoteId, Note>, note: Note): boolean {
-  if (notes.size >= LIMITS.maxRecords) return false;
-  if (note.deleted) return true;
-  let live = 0;
-  let mine = 0;
-  for (const n of notes.values()) {
-    if (n.deleted) continue;
-    live++;
-    if (n.author.id === note.author.id) mine++;
+  if (!next) return notes;
+  if (next.size > LIMITS.maxRecords) {
+    const ordered = [...next.values()].sort((a, b) => a.created - b.created || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    next = new Map(ordered.slice(0, LIMITS.maxRecords).map((n) => [n.id, n]));
   }
-  return live < LIMITS.maxLive && mine < LIMITS.perAuthor;
+  if (next.size === notes.size && [...next].every(([id, n]) => notes.get(id) === n)) return notes;
+  return next;
 }
 
 export function liveCount(notes: ReadonlyMap<NoteId, Note>, authorId?: PeerId): number {
@@ -199,7 +191,11 @@ export function createEngine(o: {
     if (next === prev) return;
     state = next;
     const notes: NoteId[] = [];
-    if (next.notes !== prev.notes) for (const [id, n] of next.notes) if (prev.notes.get(id) !== n) notes.push(id);
+    if (next.notes !== prev.notes) {
+      for (const [id, n] of next.notes) if (prev.notes.get(id) !== n) notes.push(id);
+      for (const id of prev.notes.keys()) if (!next.notes.has(id)) notes.push(id);
+      for (const id of noteLinks.keys()) if (!next.notes.has(id)) noteLinks.delete(id);
+    }
     const peers = !samePeers(prev.peers, next.peers);
     const link = prev.link !== next.link || prev.netPeers !== next.netPeers;
     if (notes.length || peers || link) for (const fn of [...subs]) fn(next, { notes, peers, link });
