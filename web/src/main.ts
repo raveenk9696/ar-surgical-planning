@@ -8,6 +8,8 @@ import { createMulti } from './net/multi';
 import { createNostrTransport } from './net/nostr';
 import { createTabsTransport } from './net/tabs';
 import type { Transport } from './net/transport';
+import { applyHero, createHeroTransport } from './scene/hero';
+import { setupAr } from './scene/xr';
 import { createViewer, type Viewer } from './scene/viewer';
 import { createEngine } from './sync/engine';
 import { newPeer } from './sync/identity';
@@ -57,7 +59,8 @@ function boot(): void {
   const status = createStatus();
   let newer = false;
   const tabs = createTabsTransport(roomId, { enabled: flags.transport !== 'net' });
-  const multi = createMulti(tabs);
+  const heroTransport = flags.hero ? createHeroTransport() : null;
+  const multi = createMulti(heroTransport ?? tabs);
   const engine = createEngine({
     token,
     self,
@@ -73,6 +76,7 @@ function boot(): void {
 
   const roster = createRoster(self.id);
   let viewer: Viewer | null = null;
+  let startAr = (): void => undefined;
 
   const openSecond = (): void => {
     const roomy = matchMedia('(min-width: 960px) and (pointer: fine)').matches;
@@ -83,7 +87,10 @@ function boot(): void {
   };
 
   const hud = createHud({
-    onSkin: (on) => viewer?.setSkin(on),
+    onSkin: (on) => {
+      hud.setSkin(on);
+      viewer?.setSkin(on);
+    },
     onArm: (on) => {
       hud.setArmed(on);
       viewer?.arm(on);
@@ -96,7 +103,7 @@ function boot(): void {
       });
     },
     onSecond: openSecond,
-    onAr: () => undefined,
+    onAr: () => startAr(),
   });
 
   const notesView = createNotesView(roster, {
@@ -143,7 +150,7 @@ function boot(): void {
   notesView.render(engine.state, []);
   engine.start();
   renderStatus();
-  hud.setAr('unsupported');
+  hud.setAr('checking');
 
   const canvas = byId<HTMLCanvasElement>('stage');
   try {
@@ -165,6 +172,7 @@ function boot(): void {
   } catch {
     showTile(MESSAGES.noGl);
     hud.setThreeDEnabled(false);
+    hud.setAr('unsupported');
     byId('progress').hidden = true;
     lazyNet(multi);
     return;
@@ -181,12 +189,25 @@ function boot(): void {
     bar.style.setProperty('--p', String(f));
     bar.setAttribute('aria-valuenow', String(Math.round(f * 100)));
   }).then(
-    () => {
+    (model) => {
       bar.hidden = true;
+      if (flags.hero && heroTransport) applyHero(flags.hero, { viewer: v, engine, transport: heroTransport, model });
+      const ar = setupAr(v.stage, model, engine, {
+        viewer: v,
+        overlay: byId('ar-overlay'),
+        toast: status.toast,
+        onActive: (active) => {
+          hud.setSkin(v.skinOn());
+          if (!active) v.layout();
+        },
+      });
+      startAr = () => void ar.start();
+      void v.stage.firstFrame.then(() => ar.supported()).then((ok) => hud.setAr(ok ? 'ready' : 'unsupported'));
     },
     (e: unknown) => {
       bar.hidden = true;
       hud.setThreeDEnabled(false);
+      hud.setAr('unsupported');
       showTile(e instanceof Error ? e.message : 'The 3D model could not be loaded.');
       lazyNet(multi);
     },

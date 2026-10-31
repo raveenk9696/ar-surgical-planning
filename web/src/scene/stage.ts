@@ -55,7 +55,8 @@ export interface Stage {
   mount(model: ModelHandle): void;
   setLayout(l: Layout): void;
   resetView(animate?: boolean): void;
-  setView(azimuthDeg: number, elevationDeg: number): void;
+  /** Jumps the camera: `zoom` brings it closer and `targetY` aims it up or down the body (m from the model centre). */
+  setView(azimuthDeg: number, elevationDeg: number, zoom?: number, targetY?: number): void;
   /** Turns the camera around the model to look at a surface with this rig-space normal. */
   faceNormal(nrm: Vector3, ms?: number): void;
   rayAt(clientX: number, clientY: number): Raycaster;
@@ -144,7 +145,7 @@ export function createStage(canvas: HTMLCanvasElement, o: { lite: boolean }): St
 
   function applyLayout(): void {
     const { w, h } = size();
-    renderer.setSize(w, h, false);
+    if (!renderer.xr.isPresenting) renderer.setSize(w, h, false);
     camera.aspect = w / h;
     if (xrActive) {
       camera.clearViewOffset();
@@ -284,11 +285,12 @@ export function createStage(canvas: HTMLCanvasElement, o: { lite: boolean }): St
       moved = false;
       glide(homePosition(homeDistance), animate ? 600 : 0);
     },
-    setView(azimuthDeg, elevationDeg) {
+    setView(azimuthDeg, elevationDeg, zoom = 1, targetY = 0) {
       moved = true;
       controls.autoRotate = false;
-      camera.position.copy(homePosition(homeDistance, azimuthDeg, elevationDeg));
-      camera.lookAt(0, 0, 0);
+      controls.target.set(0, targetY, 0);
+      camera.position.copy(homePosition(homeDistance / zoom, azimuthDeg, elevationDeg)).add(controls.target);
+      camera.lookAt(controls.target);
     },
     faceNormal(nrm, ms = 480) {
       const dir = nrm.clone().normalize();

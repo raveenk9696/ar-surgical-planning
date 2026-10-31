@@ -6,7 +6,7 @@ import type { ModelHandle } from './model';
 
 export interface Hit { pos: Vec3; nrm: Vec3; mesh: Mesh }
 
-const round = (v: number, step: number): number => Math.round(v / step) * step + 0;
+const round = (v: number, digits: number): number => Math.round(v * 10 ** digits) / 10 ** digits + 0;
 
 /** Bone first, then skin only while it is visible: a tap on a rib seen through glass pins the rib. */
 export function pick(m: ModelHandle, ray: Raycaster, skinVisible: boolean): Hit | null {
@@ -22,8 +22,8 @@ export function pick(m: ModelHandle, ray: Raycaster, skinVisible: boolean): Hit 
   const pos = rigToLps(at.rig.worldToLocal(hit.point.clone()));
   const nrm = rigDirToLps(rigNormal);
   return {
-    pos: [round(pos[0], 0.01), round(pos[1], 0.01), round(pos[2], 0.01)],
-    nrm: [round(nrm[0], 0.001), round(nrm[1], 0.001), round(nrm[2], 0.001)],
+    pos: [round(pos[0], 2), round(pos[1], 2), round(pos[2], 2)],
+    nrm: [round(nrm[0], 3), round(nrm[1], 3), round(nrm[2], 3)],
     mesh: hit.object === m.bone ? 'bone' : 'skin',
   };
 }
