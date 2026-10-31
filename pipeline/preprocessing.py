@@ -50,7 +50,7 @@ def apply_fiji_normalization(img: np.ndarray) -> np.ndarray:
     x -= img_min
     x[x < 0] = 0
     x = x * scale + 0.5
-    x[x > 255] = 0
+    x[x > 255] = 255
     return x.astype(np.uint8)
 
 
@@ -195,7 +195,7 @@ def interpolate_dcm2vol(dcm_list: List[pydicom.dataset.FileDataset],
             x -= img_min
             x[x < 0] = 0
             x = x * scale + 0.5
-            x[x > 255] = 0
+            x[x > 255] = 255
         volume.append(x.astype(np.uint8))
     volume = np.array(volume)
 
