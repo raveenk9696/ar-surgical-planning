@@ -68,7 +68,15 @@ def run_pipeline(directory):
         env={**os.environ, "MPLBACKEND": "Agg"},
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    return (directory / "DCMPLY" / "generated.ply").read_text().splitlines()
+    raw = (directory / "DCMPLY" / "generated.ply").read_bytes()
+    header, body = raw.split(b"end_header\n", 1)
+    header = header.decode("ascii").splitlines()
+    count = int(next(line.split()[2] for line in header if line.startswith("element vertex ")))
+    dtype = np.dtype([(n, "<f4") for n in "xyz"] + [(n, "u1") for n in ("red", "green", "blue")])
+    assert "format binary_little_endian 1.0" in header
+    assert len(body) == count * dtype.itemsize
+    records = np.frombuffer(body, dtype=dtype)
+    return header, np.column_stack([records[n] for n in dtype.names])
 
 
 @pytest.mark.parametrize("slice_location, padded", [(True, False), (False, False), (True, True)],
@@ -78,16 +86,11 @@ def test_ct_series_to_colored_ply(tmp_path, slice_location, padded):
     row_spacing, column_spacing, slice_spacing = ROW_SPACING, COLUMN_SPACING, SLICE_SPACING
     write_series(tmp_path, [f"slice-{z:03d}.dcm" for z in range(depth)], slice_location, padded)
     tmp_path.chmod(0o750)
-    lines = run_pipeline(tmp_path)
-    assert "" not in lines, "the PLY has blank lines between its rows"
-    end = lines.index("end_header")
-    header, body = lines[:end + 1], lines[end + 1:]
-    vertex_count = int(next(line.split()[2] for line in header
-                            if line.startswith("element vertex ")))
-    points = np.loadtxt(body, ndmin=2)
+    header, points = run_pipeline(tmp_path)
+    vertex_count = len(points)
 
     assert header[0] == "ply"
-    assert "format ascii 1.0" in header
+    assert "format binary_little_endian 1.0" in header
     for axis in "xyz":
         assert f"property float32 {axis}" in header
     for channel in ("red", "green", "blue"):
@@ -122,4 +125,4 @@ def test_file_names_do_not_change_the_model(tmp_path):
     write_series(in_order, [f"slice-{z:03d}.dcm" for z in range(DEPTH)])
     names = [f"slice-{z:03d}.dcm" for z in np.random.default_rng(0).permutation(DEPTH)]
     write_series(shuffled, names)
-    assert sorted(run_pipeline(shuffled)) == sorted(run_pipeline(in_order))
+    np.testing.assert_array_equal(run_pipeline(shuffled)[1], run_pipeline(in_order)[1])

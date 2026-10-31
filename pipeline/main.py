@@ -1,35 +1,17 @@
-# SCRIPT
-# Standard Packages
+"""Convert a CT DICOM series to a colored point cloud."""
 import argparse
 import time
 
-# Custom Packages
 from convertor import convertor
 
-# Main Function
-if __name__ == '__main__':
-    # execute only if run as a script
-    parser = argparse.ArgumentParser(description="Provide path of DICOM images and interpolation factor")
-    parser.add_argument('path', metavar='p', type=str,
-                        help='The directory or file path of the DICOM images')
-    parser.add_argument('interp_factor', metavar='f', type=float,
-                        help='Determines number of slices when using method 0')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("path", help="Directory containing one CT DICOM series")
+    parser.add_argument("interp_factor", type=float, help="Additional slices per mm of stack depth")
+    parser.add_argument("--threshold-hu", type=float, default=-500,
+                        help="Keep samples at or above this HU value (default -500, drops air and keeps skin)")
     args = parser.parse_args()
-    path = args.path
-    interp_factor = args.interp_factor
-
-    if interp_factor < 0 or interp_factor > 1:
-        RuntimeWarning(f"Interp_factor received: {interp_factor}, but interp_factor must be between 0 and 1. "
-                       f"Changed to 0.1")
-        interp_factor = 0.1
-# Timer Start
-    startTime = time.time()
-
-# Conversion Function
-    convertor(path, interp_factor)
-
-# Timer End
-    executionTime = (time.time() - startTime)
-    print('Execution time in seconds: ' + str(executionTime))
-
-# Append to Excel Sheet - TO DO
+    start = time.perf_counter()
+    count = convertor(args.path, args.interp_factor, args.threshold_hu)
+    print(f"Wrote {count} points in {time.perf_counter() - start:.2f} s")

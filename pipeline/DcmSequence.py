@@ -92,6 +92,17 @@ class DcmSequence:
                     self._collection.append(ds)
                     self._dcm_files.append(file)
 
+    def volume(self):
+        from volume import Volume
+
+        if not self._collection:
+            raise ValueError("No DICOM slices found")
+        hu = np.stack([ds.pixel_array.astype(np.float32) * float(getattr(ds, "RescaleSlope", 1))
+                       + float(getattr(ds, "RescaleIntercept", 0)) for ds in self._collection])
+        row, column, gap = self.voxel_spacing()
+        affine = np.array([[0, 0, column, 0], [0, row, 0, 0], [-gap, 0, 0, 0], [0, 0, 0, 1]], dtype=float)
+        return Volume(hu, affine, str(self._collection[0].SeriesInstanceUID))
+
     def stack_size(self):
         length = len(self._dcm_files)
         return length
