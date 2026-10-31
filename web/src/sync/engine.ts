@@ -40,7 +40,6 @@ function digestOfMap(notes: ReadonlyMap<NoteId, Note>): Digest {
 
 const sameDigest = (a: Digest, b: Digest): boolean => a.n === b.n && a.h === b.h;
 
-/** Merges records under the caps. Returns the same map when nothing changed. */
 export function mergeNotes(notes: ReadonlyMap<NoteId, Note>, incoming: readonly Note[]): ReadonlyMap<NoteId, Note> {
   let next: Map<NoteId, Note> | null = null;
   for (const note of incoming) {

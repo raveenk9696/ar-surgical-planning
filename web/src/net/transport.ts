@@ -11,7 +11,6 @@ export interface Transport {
   close(): void;
 }
 
-/** A small typed listener set shared by the transports. */
 export function createSignal<A extends unknown[]>(): { on(fn: (...a: A) => void): () => void; emit(...a: A): void } {
   const fns = new Set<(...a: A) => void>();
   return {

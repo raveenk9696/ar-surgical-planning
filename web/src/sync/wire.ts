@@ -71,7 +71,6 @@ function note(x: unknown): Note | null {
   return { id, pos, nrm, mesh, text: body, author, created, deleted };
 }
 
-/** The only door for inbound data. Returns null for anything that is not a well-formed v1 message. */
 export function decode(raw: unknown): Wire | null {
   if (!isObj(raw) || raw.v !== 1) return null;
   switch (raw.k) {

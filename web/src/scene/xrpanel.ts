@@ -33,7 +33,6 @@ function draw(label: string, on: boolean): CanvasTexture {
 
 export interface XrPanel {
   readonly group: Group;
-  /** Which control the ray points at, if any. */
   hit(ray: Raycaster): PanelId | null;
   setLabel(id: PanelId, label: string, on?: boolean): void;
   /** Keeps the panel 0.12 x 0.04 m in the world however the model is scaled, and parks it beside the model. */
@@ -41,7 +40,6 @@ export interface XrPanel {
   dispose(): void;
 }
 
-/** Controls for AR sessions where the page cannot show HTML: five tappable planes beside the model. */
 export function createXrPanel(parent: Group): XrPanel {
   const group = new Group();
   const geo = new PlaneGeometry(W, H);

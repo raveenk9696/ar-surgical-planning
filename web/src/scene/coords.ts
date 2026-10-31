@@ -24,12 +24,10 @@ export function rigDirToLps(d: Vector3): Vec3 {
   return [d.x, 0 - d.z, d.y];
 }
 
-/** Rotation about Y that turns a model's +Z (the patient's front) from `model` toward `viewer`. */
 export function yawToward(model: Vector3, viewer: Vector3): number {
   return Math.atan2(viewer.x - model.x, viewer.z - model.z);
 }
 
-/** Pose for the model `m` metres ahead of the viewer, half a metre below eye height, front toward the viewer. */
 export function placeInFront(viewer: Matrix4, m: number): Matrix4 {
   const eye = new Vector3().setFromMatrixPosition(viewer);
   const ahead = new Vector3(0, 0, -1).transformDirection(viewer);
@@ -43,7 +41,6 @@ export function placeInFront(viewer: Matrix4, m: number): Matrix4 {
 }
 
 export const CAMERA_FOV_DEG = 28;
-/** Default view: from the front, 24 degrees toward the patient's left, 8 degrees above. */
 export const HOME_AZIMUTH_DEG = 24;
 export const HOME_ELEVATION_DEG = 8;
 

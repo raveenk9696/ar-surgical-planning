@@ -15,7 +15,6 @@ const LEFT_HIP = { x: 95, z: -437 };
 const RIGHT_ILIAC = { x: -100, z: -330 };
 const POINTER = { x: -35, z: -330 };
 
-/** A transport with no network. In hero mode the page talks only to a made-up second person. */
 export function createHeroTransport(): Transport & { inject(w: Wire): void } {
   const message = createSignal<[unknown]>();
   const status = createSignal<[StatusUpdate]>();
@@ -31,7 +30,6 @@ export function createHeroTransport(): Transport & { inject(w: Wire): void } {
   };
 }
 
-/** The bone point on the front of the patient at LPS (x, z). */
 export function probeFront(model: ModelHandle, x: number, z: number): Hit | null {
   const m = model.root.matrixWorld;
   const origin = new Vector3(x, model.bbox.min.y - 100, z).applyMatrix4(m);
@@ -43,7 +41,6 @@ function noteAt(id: string, text: string, hit: Hit, author: Peer): Note {
   return { id, pos: hit.pos, nrm: hit.nrm, mesh: hit.mesh, text, author, created: Date.now(), deleted: false };
 }
 
-/** Frames the model for the README renders. Returns false if the anatomy points are not on the scan. */
 export function applyHero(mode: HeroMode, h: { viewer: Viewer; engine: Engine; transport: Pick<Transport & { inject(w: Wire): void }, 'inject'>; model: ModelHandle }): boolean {
   const { viewer, engine, transport, model } = h;
   document.body.classList.add(`hero-${mode}`);

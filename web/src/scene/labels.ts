@@ -126,7 +126,6 @@ export function drawRing(colour: string): CanvasTexture {
   return texture(c, { w: S, h: S });
 }
 
-/** The name tag beside a remote pointer: white 14/600 text on the author's colour. */
 export function drawPill(name: string, colour: string): CanvasTexture {
   const probe = canvas(1, 1).ctx;
   probe.font = `600 14px ${UI}`;

@@ -199,7 +199,6 @@ export function createPins(marks: Object3D, view: { colorOf(id: PeerId): string;
   };
 }
 
-/** Pixel position inside the canvas, in CSS px. */
 export function projectToScreen(world: Vector3, camera: Camera, rect: DOMRect): { x: number; y: number } {
   const p = world.clone().project(camera);
   return { x: (p.x * 0.5 + 0.5) * rect.width, y: (-p.y * 0.5 + 0.5) * rect.height };

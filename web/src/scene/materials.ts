@@ -8,7 +8,6 @@ export interface Materials {
   skin: MeshPhysicalMaterial;
 }
 
-// The numbers below are starting guesses tuned by eye against renders (see the build notes).
 const LITE_SKIN_OPACITY = 0.26;
 
 export function createMaterials(quality: Quality): Materials {

@@ -89,7 +89,6 @@ function isIdentity(o: Object3D): boolean {
   return o.matrixWorld.elements.every((v, i) => Math.abs(v - (id[i] ?? 0)) < EPS);
 }
 
-/** Loads the packed GLB, checks its contract, and builds the picking trees. Throws ModelError. */
 export async function loadModel(url: string, onProgress: (f: number) => void): Promise<ModelHandle> {
   const buffer = await fetchBuffer(url, onProgress);
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);

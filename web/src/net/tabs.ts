@@ -1,7 +1,6 @@
 import type { Wire } from '../types';
 import { createSignal, type StatusUpdate, type Transport } from './transport';
 
-/** Same-browser sync over BroadcastChannel. It works offline and costs nothing. */
 export function createTabsTransport(roomId: string, o: { enabled?: boolean } = {}): Transport {
   const message = createSignal<[unknown]>();
   const status = createSignal<[StatusUpdate]>();

@@ -22,7 +22,6 @@ export function setLabel(button: HTMLElement, text: string): void {
   if (label) label.textContent = text;
 }
 
-/** Replaces the leading icon of a button, keeping its label. */
 export function setIcon(button: HTMLElement, icon: Element | null): void {
   button.querySelector(':scope > svg.icon')?.remove();
   if (icon) button.prepend(icon);

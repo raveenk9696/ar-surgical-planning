@@ -31,7 +31,6 @@ export interface ArUi {
   viewer: Viewer;
   overlay: HTMLElement;
   toast(text: string): void;
-  /** called when a session starts or ends so the page can sync its own controls */
   onActive(active: boolean): void;
 }
 
@@ -55,7 +54,6 @@ function reticle(): Group {
   return holder;
 }
 
-/** An AR session: place the model with a hit test (or 1.2 m ahead), then add preset notes with the controller ray. */
 export function setupAr(stage: Stage, model: ModelHandle, engine: Engine, ui: ArUi): Ar {
   const xr = navigator.xr;
   const ray = new Raycaster();
