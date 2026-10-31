@@ -281,7 +281,7 @@ images: np.ndarray,
     print("Updating header with vertex count: {0}".format(total_points))
     f = fileinput.FileInput(ply, inplace=True)
     for line in tqdm.tqdm(f, total=total_points):
-        print(line.replace("<VERTEXCOUNT>", str(total_points)))
+        print(line.replace("<VERTEXCOUNT>", str(total_points)), end="")
     f.close()
     # pcd = o3d.io.read_point_cloud(ply)
     # o3d.io.write_point_cloud("generated.ply", pcd)
