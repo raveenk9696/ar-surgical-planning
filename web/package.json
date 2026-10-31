@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke.mjs",
     "probe:relays": "node scripts/probe-relays.mjs",
-    "model:pack": "node scripts/pack-model.mjs"
+    "model:pack": "node scripts/pack-model.mjs",
+    "prebuild": "node scripts/ensure-model.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",

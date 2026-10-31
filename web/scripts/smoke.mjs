@@ -109,7 +109,7 @@ function checkModel(path, limit, strictBox) {
 const modelsDir = join(dist, 'models');
 const models = existsSync(modelsDir) ? readdirSync(modelsDir).filter((f) => f.endsWith('.glb')) : [];
 if (models.length === 0) {
-  if (process.env.SMOKE_REQUIRE_MODEL === '1') fail('no model in dist/models');
+  if (process.env.SMOKE_REQUIRE_MODEL === '1' || process.env.AR_MODEL_SRC) fail('no model in dist/models');
   else console.log('model checks skipped: no dist/models/*.glb');
 } else {
   for (const m of models) checkModel(join(modelsDir, m), m.endsWith('-lite.glb') ? LIMITS.liteGlb : LIMITS.fullGlb, !m.endsWith('-lite.glb'));
