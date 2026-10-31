@@ -9,19 +9,23 @@ from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.uid import CTImageStorage, ExplicitVRLittleEndian, generate_uid
 
 
-@pytest.mark.parametrize("slice_location", [True, False], ids=["with-slice-location", "without-slice-location"])
-def test_ct_series_to_colored_ply(tmp_path, slice_location):
-    depth, height, width = 24, 64, 64
-    row_spacing, column_spacing, slice_spacing = 0.7, 0.8, 2.5
+DEPTH, HEIGHT, WIDTH = 24, 64, 64
+ROW_SPACING, COLUMN_SPACING, SLICE_SPACING = 0.7, 0.8, 2.5
+
+
+def write_series(directory, names, slice_location=True):
+    depth, height, width = DEPTH, HEIGHT, WIDTH
+    row_spacing, column_spacing, slice_spacing = ROW_SPACING, COLUMN_SPACING, SLICE_SPACING
     series_uid = generate_uid()
     study_uid = generate_uid()
     y, x = np.ogrid[:height, :width]
-    pixels = np.full((height, width), -1000, dtype=np.int16)
-    pixels[8:-8, 8:-8] = 0
-    pixels[(x - width // 2) ** 2 + (y - height // 2) ** 2 <= 8 ** 2] = 1000
+    distance = np.hypot(x - width // 2, y - height // 2)
 
     for z in range(depth):
-        filename = tmp_path / f"slice-{z:03d}.dcm"
+        pixels = np.full((height, width), -1000, dtype=np.int16)
+        pixels[8:-8, 8:-8] = 0
+        pixels[distance <= 4 + 4 * z // depth] = 1000
+        filename = directory / names[z]
         meta = FileMetaDataset()
         meta.TransferSyntaxUID = ExplicitVRLittleEndian
         meta.MediaStorageSOPClassUID = CTImageStorage
@@ -53,16 +57,25 @@ def test_ct_series_to_colored_ply(tmp_path, slice_location):
         ds.PixelData = pixels.tobytes()
         ds.save_as(str(filename), enforce_file_format=True)
 
-    tmp_path.chmod(0o750)
+
+def run_pipeline(directory):
     result = subprocess.run(
         [sys.executable, str(Path(__file__).resolve().parents[1] / "main.py"),
-         str(tmp_path), "0.1"],
+         str(directory), "0.1"],
         capture_output=True, text=True, timeout=120,
         env={**os.environ, "MPLBACKEND": "Agg"},
     )
     assert result.returncode == 0, result.stdout + result.stderr
+    return (directory / "DCMPLY" / "generated.ply").read_text().splitlines()
 
-    lines = (tmp_path / "DCMPLY" / "generated.ply").read_text().splitlines()
+
+@pytest.mark.parametrize("slice_location", [True, False], ids=["with-slice-location", "without-slice-location"])
+def test_ct_series_to_colored_ply(tmp_path, slice_location):
+    depth, height, width = DEPTH, HEIGHT, WIDTH
+    row_spacing, column_spacing, slice_spacing = ROW_SPACING, COLUMN_SPACING, SLICE_SPACING
+    write_series(tmp_path, [f"slice-{z:03d}.dcm" for z in range(depth)], slice_location)
+    tmp_path.chmod(0o750)
+    lines = run_pipeline(tmp_path)
     assert "" not in lines, "the PLY has blank lines between its rows"
     end = lines.index("end_header")
     header, body = lines[:end + 1], lines[end + 1:]
@@ -93,7 +106,17 @@ def test_ct_series_to_colored_ply(tmp_path, slice_location):
     assert ((columns >= 7.5) & (columns <= width - 8.5)
             & (rows >= 7.5) & (rows <= height - 8.5)).all(), "air voxels were kept"
     radius = np.hypot(columns - width // 2, rows - height // 2)
-    bone, skin = points[radius <= 6, 3], points[radius >= 10, 3]
+    bone, skin = points[radius <= 3, 3], points[radius >= 10, 3]
     assert bone.size > 0, "bone is missing from the model"
     assert skin.size > 0, "skin is missing from the model"
     assert bone.min() > skin.max(), "bone is not brighter than skin"
+
+
+def test_file_names_do_not_change_the_model(tmp_path):
+    in_order, shuffled = tmp_path / "in-order", tmp_path / "shuffled"
+    in_order.mkdir()
+    shuffled.mkdir()
+    write_series(in_order, [f"slice-{z:03d}.dcm" for z in range(DEPTH)])
+    names = [f"slice-{z:03d}.dcm" for z in np.random.default_rng(0).permutation(DEPTH)]
+    write_series(shuffled, names)
+    assert sorted(run_pipeline(shuffled)) == sorted(run_pipeline(in_order))
