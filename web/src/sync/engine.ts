@@ -343,7 +343,7 @@ export function createEngine(o: {
     addNote(i) { return serialize(async () => {
       const normalized = i.text.normalize('NFKC');
       if (!isSafeText(normalized)) return { ok: false, why: 'empty' };
-      const text = normalized.replace(/\s+/g, ' ').trim().slice(0, LIMITS.textMax);
+      const text = Array.from(normalized.replace(/\s+/g, ' ').trim()).slice(0, LIMITS.textMax).join('');
       if (!text) return { ok: false, why: 'empty' };
       const { notes } = state;
       if (liveCount(notes) >= LIMITS.maxLive || liveCount(notes, self.id) >= LIMITS.perAuthor) {

@@ -9,7 +9,7 @@ const NOTE_ID = /^[A-Z2-7]{8}\.\d{1,9}$/;
 const FORBIDDEN_KEYS = ['__proto__', 'constructor', 'prototype'];
 const NAME_MAX = 16;
 export function isSafeText(value: string): boolean {
-  return !/[\p{Cc}\p{Cf}\u2028\u2029]/u.test(value) && value === value.normalize('NFKC');
+  return !/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\u2028\u2029\uFDD0-\uFDEF\uFFFE\uFFFF\uFFFC\u115F\u1160\u034F\u17B4\u17B5\u2800\u3164\uFFA0\u1680\uFE00-\uFE0F]/u.test(value) && /[^\s\p{M}]/u.test(value.trim()) && value === value.normalize('NFKC');
 }
 
 function isObj(x: unknown): x is Obj {
@@ -25,7 +25,7 @@ function exact(o: unknown, keys: readonly string[]): o is Obj {
 }
 
 function text(x: unknown, min: number, max: number): string | null {
-  return typeof x === 'string' && x.length >= min && x.length <= max && isSafeText(x) ? x : null;
+  return typeof x === 'string' && x.length <= max * 2 && Array.from(x).length >= min && Array.from(x).length <= max && isSafeText(x) ? x : null;
 }
 
 function vec3(x: unknown, limit: number): Vec3 | null {

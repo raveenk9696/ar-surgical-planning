@@ -11,7 +11,10 @@ export interface NoteInput {
 export function createNoteInput(o: { onSubmit(text: string): void; onCancel(): void }): NoteInput {
   const form = byId<HTMLFormElement>('note-form');
   const input = byId<HTMLInputElement>('note-input');
-  input.maxLength = LIMITS.textMax;
+  input.removeAttribute('maxlength');
+  input.addEventListener('input', () => {
+    input.value = Array.from(input.value).slice(0, LIMITS.textMax).join('');
+  });
   let open = false;
 
   const cancel = (): void => {

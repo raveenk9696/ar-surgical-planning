@@ -1,3 +1,5 @@
+import { decode } from "./wire";
+
 import { identity, peer, noteBy, run, settle } from '../test/signed';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeHub, type FakeEnd } from '../test/fakehub';
@@ -676,4 +678,13 @@ it('delivers honest notes and presence during a 300-message-per-second link floo
   await settle();
   expect(a.engine.state.notes.size).toBe(10);
   expect(a.engine.state.peers.get(peer('V').id)?.seq).toBe(995);
+});
+
+it('cuts local text at 24 code points without splitting an emoji', async () => {
+  const a = mk(new FakeHub(), 'A');
+  await a.engine.start();
+  expect((await add(a.engine, 'a'.repeat(23) + '😀extra')).ok).toBe(true);
+  expect(texts(a.engine)).toEqual(['a'.repeat(23) + '😀']);
+  const wire = a.end.sent.at(-1);
+  expect(wire && decode(wire)).not.toBeNull();
 });

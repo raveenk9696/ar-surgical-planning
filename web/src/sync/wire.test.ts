@@ -98,3 +98,10 @@ it.each(['\u200B', '\u202E', '\u2066', '\u2028', '\u2029', 'ｈｉｐ'])('reject
   expect(decode(withNote({ text }))).toBeNull();
   expect(decode({ v: 2, k: 'snapshot', from: peer.id, notes: [{ ...note, text }] })).toMatchObject({ notes: [] });
 });
+
+it.each(['\uD800', '\uDC00', '\uE000', '\u{F0000}', '\u0378', '\uFDD0', '\uFFFF', '\u{10FFFF}', '\u115F', '\u1160', '\u034F', '\u17B4', '\u17B5', '\u2800', '\u3164', '\uFFA0', '\u1680', ...Array.from({ length: 16 }, (_, i) => String.fromCodePoint(0xFE00 + i))])('rejects the verifier invisible or invalid code point %j', (ch) => {
+  expect(decode(withNote({ text: `a${ch}b` }))).toBeNull();
+});
+it.each(['   ', '\u0301\u0301'])('rejects notes without a visible character %j', (text) => {
+  expect(decode(withNote({ text }))).toBeNull();
+});
