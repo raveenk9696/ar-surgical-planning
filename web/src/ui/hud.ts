@@ -53,7 +53,7 @@ export function createHud(o: {
   setIcon(reset, icon('reset'));
   setIcon(ar, icon('cube'));
   byId('sheet-close').append(icon('close'));
-  byId('btn-share').querySelector('.label')?.setAttribute('aria-live', 'polite');
+  share.querySelector('.label')?.setAttribute('aria-live', 'polite');
   if (matchMedia('(pointer: coarse)').matches) hint.textContent = 'Drag to rotate. Pinch to zoom.';
   const hintTimer = setTimeout(() => hint.classList.add('gone'), 6000);
 
@@ -71,7 +71,8 @@ export function createHud(o: {
       arState = s;
       ar.setAttribute('aria-disabled', String(s !== 'ready'));
       arHelp.hidden = s !== 'unsupported';
-      ar.setAttribute('aria-describedby', s === 'unsupported' ? 'ar-help' : '');
+      if (s === 'unsupported') ar.setAttribute('aria-describedby', 'ar-help');
+      else ar.removeAttribute('aria-describedby');
     },
     setShareCopied() {
       paintShare(true);

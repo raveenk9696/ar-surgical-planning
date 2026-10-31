@@ -55,7 +55,7 @@ function reticle(): Group {
   return holder;
 }
 
-/** WebXR placement, notes and controls. Needs a secure context; the emulator and devices are where this was exercised. */
+/** An AR session: place the model with a hit test (or 1.2 m ahead), then add preset notes with the controller ray. */
 export function setupAr(stage: Stage, model: ModelHandle, engine: Engine, ui: ArUi): Ar {
   const xr = navigator.xr;
   const ray = new Raycaster();
@@ -101,8 +101,9 @@ export function setupAr(stage: Stage, model: ModelHandle, engine: Engine, ui: Ar
     panel?.place(size, model.widthM);
   }
 
-  function viewerMatrix(): Matrix4 {
-    return stage.renderer.xr.getCamera().matrixWorld;
+  function viewerMatrix(f: XRFrame, refSpace: XRReferenceSpace): Matrix4 {
+    const pose = f.getViewerPose(refSpace);
+    return pose ? new Matrix4().fromArray(pose.transform.matrix) : new Matrix4().copy(stage.renderer.xr.getCamera().matrixWorld);
   }
 
   function place(at: Vector3, yaw: number): void {
@@ -141,13 +142,15 @@ export function setupAr(stage: Stage, model: ModelHandle, engine: Engine, ui: Ar
   function onSelect(e: XRInputSourceEvent): void {
     const frame = e.frame;
     const refSpace = stage.renderer.xr.getReferenceSpace();
+    if (!refSpace) return;
     if (phase === 'placing') {
-      const eye = new Vector3().setFromMatrixPosition(viewerMatrix());
+      const head = viewerMatrix(frame, refSpace);
+      const eye = new Vector3().setFromMatrixPosition(head);
       if (hasHit && !noHitTest) {
         const at = new Vector3().setFromMatrixPosition(shown.matrix);
         place(at, yawToward(at, eye));
       } else {
-        const m = placeInFront(viewerMatrix(), AHEAD_M);
+        const m = placeInFront(head, AHEAD_M);
         const at = new Vector3().setFromMatrixPosition(m);
         const yaw = yawToward(at, eye);
         place(new Vector3(at.x, at.y - (model.heightM / 2) * size, at.z), yaw);
@@ -155,7 +158,7 @@ export function setupAr(stage: Stage, model: ModelHandle, engine: Engine, ui: Ar
       }
       return;
     }
-    if (!refSpace || !setRay(frame, e.inputSource, refSpace)) return;
+    if (!setRay(frame, e.inputSource, refSpace)) return;
     stage.stage.updateMatrixWorld(true);
     const control = panel?.hit(ray);
     if (control) {
@@ -245,6 +248,7 @@ export function setupAr(stage: Stage, model: ModelHandle, engine: Engine, ui: Ar
     if (!domOverlay) panel = createXrPanel(stage.stage);
     document.body.classList.add('in-ar');
     ui.overlay.hidden = !domOverlay;
+    ui.overlay.style.visibility = '';
     ui.onActive(true);
     syncChips();
     off = [stage.onFrame(frame)];
@@ -270,6 +274,7 @@ export function setupAr(stage: Stage, model: ModelHandle, engine: Engine, ui: Ar
     ui.viewer.setQuality(restoreQuality);
     engine.setPointer(null);
     ui.overlay.hidden = true;
+    ui.overlay.style.visibility = '';
     document.body.classList.remove('in-ar');
     ui.onActive(false);
   }
@@ -284,6 +289,9 @@ export function setupAr(stage: Stage, model: ModelHandle, engine: Engine, ui: Ar
     },
     async start() {
       if (!xr || session) return;
+      // Browsers want the overlay root rendered when the session is requested.
+      ui.overlay.hidden = false;
+      ui.overlay.style.visibility = 'hidden';
       try {
         const s = await xr.requestSession('immersive-ar', {
           optionalFeatures: ['local-floor', 'hit-test', 'dom-overlay'],

@@ -132,7 +132,6 @@ export function createViewer(
     pointer.inside = false;
     deps.engine.setPointer(null);
   });
-  document.addEventListener('visibilitychange', () => deps.engine.setAway(document.hidden));
 
   stage.onFrame((dt, now) => {
     if (model && pointer.inside && pointer.dirty && !pointer.touch && !document.hidden && now - lastPick >= 1000 / LIMITS.presenceHz) {

@@ -107,7 +107,10 @@ function boot(): void {
   });
 
   const notesView = createNotesView(roster, {
-    onHover: (id) => viewer?.hover(id),
+    onHover: (id) => {
+      viewer?.hover(id);
+      if (id) viewer?.focus(id);
+    },
     onSelect: (id) => {
       notesView.select(id);
       viewer?.focus(id);
@@ -141,6 +144,7 @@ function boot(): void {
     viewer?.arm(false);
     hud.openSheet(false);
   });
+  document.addEventListener('visibilitychange', () => engine.setAway(document.hidden));
   addEventListener('pagehide', () => engine.stop());
   addEventListener('pageshow', (e) => {
     if (e.persisted) engine.start();

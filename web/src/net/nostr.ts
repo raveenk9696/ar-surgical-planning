@@ -5,7 +5,7 @@ import type { Wire } from '../types';
 import { createSignal, type StatusUpdate, type Transport } from './transport';
 
 const POLL_MS = 1000;
-const DOWN_AFTER_MS = 10_000;
+const DOWN_AFTER_MS = 8000;
 const OPEN = 1;
 
 /** Other devices, over WebRTC with public Nostr relays as the signalling channel. This module is only ever dynamic-imported. */
