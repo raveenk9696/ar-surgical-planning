@@ -396,13 +396,13 @@ describe('reduce', () => {
 });
 
 describe('mergeNotes caps', () => {
-  it('merges remote records beyond local creation caps', async () => {
+  it('caps remote live records at 100', async () => {
     const incoming: Note[] = [];
     for (const c of 'BCDEFG') for (let n = 1; n <= 25; n++) incoming.push(noteBy(c, n));
     const notes = mergeNotes(new Map(), incoming);
     await settle();
-    expect(notes.size).toBe(150);
-    for (const c of 'BCDEFG') expect([...notes.values()].filter((n) => n.author.id === peer(c).id)).toHaveLength(25);
+    expect(notes.size).toBe(100);
+
   });
 
   it('stops at 300 records, counting tombstones, but still applies deletes', async () => {
@@ -587,7 +587,7 @@ it('converges three replicas after concurrent adds at 99 notes with loss, duplic
   await run(12_000);
   for (const { engine } of replicas) {
     await settle();
-    expect(engine.state.notes.size).toBe(102);
+    expect(engine.state.notes.size).toBe(100);
     await settle();
     expect(digestOf(engine.state.notes.values())).toEqual(digestOf(replicas[0]!.engine.state.notes.values()));
     engine.stop();
@@ -598,10 +598,10 @@ it('keeps the same 300 records regardless of union order and notifies about evic
   const notes = Array.from({ length: 301 }, (_, i) => noteBy('B', i + 1, { created: Date.now() - 1, deleted: true, text: '' }));
   await settle();
   expect(mergeNotes(new Map(), notes)).toEqual(mergeNotes(new Map(), [...notes].reverse()));
-  const a = mk(new FakeHub(), 'A');
+  const storage = { getItem: () => JSON.stringify({ savedAt: Date.now(), notes: notes.slice(0, 300) }), setItem: vi.fn() } as unknown as Storage;
+  const a = mk(new FakeHub(), 'A', { storage });
   await a.engine.start();
-  a.end.inject({ v: 2, k: 'snapshot', from: peer('B').id, notes: notes.slice(0, 300) });
-  await expect.poll(() => a.engine.state.notes.size).toBe(300);
+  expect(a.engine.state.notes.size).toBe(300);
   const changes: string[] = [];
   a.engine.subscribe((_s, c) => changes.push(...c.notes));
   const before = new Set(a.engine.state.notes.keys());
@@ -635,4 +635,31 @@ it('lets a new presence link recover an id after five seconds of silence', async
   await run(5000);
   a.end.inject({ ...presence, seq: 1, ptr: [1, 2, 3] }, 'nostr:v');
   expect(a.engine.state.peers.get(peer('V').id)?.ptr).toEqual([1, 2, 3]);
+});
+
+it('counts 300 relayed deletions against the introducing link and preserves honest notes', async () => {
+  const a = mk(new FakeHub(), 'A');
+  await a.engine.start();
+  await add(a.engine, 'honest');
+  const tombs = Array.from({ length: 300 }, (_, i) => noteBy('M', i + 1, { deleted: true, created: Date.now() - 1000 }));
+  a.end.inject({ v: 2, k: 'snapshot', from: peer('B').id, notes: tombs }, 'nostr:m');
+  await expect.poll(() => a.engine.state.notes.size > 1).toBe(true);
+  expect(a.engine.state.notes.size).toBeLessThanOrEqual(21);
+  expect(texts(a.engine)).toEqual(['honest']);
+  expect((await add(a.engine, 'after')).ok).toBe(true);
+});
+it('lets a third tab see all 24 honest notes', async () => {
+  const a = mk(new FakeHub(), 'C');
+  await a.engine.start();
+  for (const c of ['A', 'B']) {
+    a.end.inject({ v: 2, k: 'snapshot', from: peer(c).id, notes: Array.from({ length: 12 }, (_, i) => noteBy(c, i + 1)) }, 'tab');
+    await run(2100);
+  }
+  expect(a.engine.state.notes.size).toBe(24);
+});
+it('evicts deletions before live notes in every arrival order', () => {
+  const tombs = Array.from({ length: 300 }, (_, i) => noteBy('M', i + 1, { deleted: true, created: Date.now() - 1000 }));
+  const honest = noteBy('A', 1);
+  expect(mergeNotes(new Map(), [...tombs, honest]).has(honest.id)).toBe(true);
+  expect(mergeNotes(new Map(), [...tombs, honest])).toEqual(mergeNotes(new Map(), [honest, ...tombs.reverse()]));
 });

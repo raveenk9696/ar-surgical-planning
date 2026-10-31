@@ -52,9 +52,10 @@ export function mergeNotes(notes: ReadonlyMap<NoteId, Note>, incoming: readonly 
     next.set(note.id, merged.note);
   }
   if (!next) return notes;
-  if (next.size > LIMITS.maxRecords) {
-    const ordered = [...next.values()].sort((a, b) => a.created - b.created || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    next = new Map(ordered.slice(0, LIMITS.maxRecords).map((n) => [n.id, n]));
+  if (next.size > LIMITS.maxRecords || liveCount(next) > LIMITS.maxLive) {
+    const ordered = [...next.values()].sort((a, b) => Number(a.deleted) - Number(b.deleted) || a.created - b.created || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    let live = 0;
+    next = new Map(ordered.filter((n) => n.deleted || ++live <= LIMITS.maxLive).slice(0, LIMITS.maxRecords).map((n) => [n.id, n]));
   }
   if (next.size === notes.size && [...next].every(([id, n]) => notes.get(id) === n)) return notes;
   return next;
@@ -183,7 +184,7 @@ export function createEngine(o: {
   let lastSnapshotAt = -Infinity;
   let cacheDirtyAt: number | null = null;
   let newerReported = false;
-  const noteLinks = new Map<NoteId, Link>();
+  const noteLinks = new Map<NoteId, string>();
   const identities = new Map<PeerId, { link: Link; seenAt: number }>();
   const linkPeers = new Map<Link, PeerId>();
 
@@ -283,13 +284,19 @@ export function createEngine(o: {
     const t = now();
     let accepted = msg;
     if (msg.k === 'note' || msg.k === 'snapshot') {
-      let owned = 0;
-      for (const [id, owner] of noteLinks) if (owner === link && state.notes.get(id)?.deleted === false) owned++;
+      const counts = new Map<string, number>();
+      for (const owner of noteLinks.values()) counts.set(owner, (counts.get(owner) ?? 0) + 1);
       const notes = (msg.k === 'note' ? [msg.note] : msg.notes).filter((n) => {
-        if (n.author.id !== from || n.deleted || state.notes.has(n.id)) return true;
-        if (owned >= LIMITS.perAuthor) return false;
-        noteLinks.set(n.id, link);
-        owned++;
+        const prev = state.notes.get(n.id);
+        if (prev && !mergeNote(prev, n).changed) return true;
+        const owner = link === 'tab' ? `tab:${n.author.id}` : link;
+        const previousOwner = noteLinks.get(n.id);
+        if (previousOwner === owner) return true;
+        const count = counts.get(owner) ?? 0;
+        if (count >= LIMITS.perAuthor) return false;
+        if (previousOwner) counts.set(previousOwner, (counts.get(previousOwner) ?? 1) - 1);
+        noteLinks.set(n.id, owner);
+        counts.set(owner, count + 1);
         return true;
       });
       if (msg.k === 'note') {
@@ -297,6 +304,7 @@ export function createEngine(o: {
       } else accepted = { ...msg, notes };
     }
     const { state: next, out } = reduce(state, accepted, t);
+    for (const id of noteLinks.keys()) if (!next.notes.has(id)) noteLinks.delete(id);
     if (msg.k === 'bye') unbind(from);
     const notesChanged = next.notes !== state.notes;
     commit(next);
@@ -337,7 +345,7 @@ export function createEngine(o: {
       const text = normalized.replace(/\s+/g, ' ').trim().slice(0, LIMITS.textMax);
       if (!text) return { ok: false, why: 'empty' };
       const { notes } = state;
-      if (notes.size >= LIMITS.maxRecords || liveCount(notes) >= LIMITS.maxLive || liveCount(notes, self.id) >= LIMITS.perAuthor) {
+      if (liveCount(notes) >= LIMITS.maxLive || liveCount(notes, self.id) >= LIMITS.perAuthor) {
         return { ok: false, why: 'full' };
       }
       if (!ownNotes.take('self')) return { ok: false, why: 'rate' };
