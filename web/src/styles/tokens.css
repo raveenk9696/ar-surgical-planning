@@ -1,0 +1,23 @@
+:root {
+  --navy: #0b1f3a;  --blue: #2563eb;  --sky: #bfdbfe;  --mist: #eef4fd;  --frost: #f8fbff;
+  --red: #e11d48;   --white: #ffffff;  --line: #e2e8f0; --line-strong: #cbd5e1;
+  --muted: #64748b; --note-ink: #475569;
+  --blue-bright: #3b82f6; --blue-strong: #1d4ed8; --blue-deep: #1e40af; --navy-light: #1e3a8a; --sky-pale: #e0edff;
+  /* derived */
+  --action-ink: linear-gradient(160deg, var(--blue) 0%, var(--blue-strong) 55%, var(--blue-deep) 100%);
+  --surface: linear-gradient(160deg, var(--frost), var(--mist));          /* panels */
+  --stage-wash: radial-gradient(60% 55% at 50% 56%, var(--frost) 0%, var(--white) 72%);
+  --card-lift: 0 30px 60px -36px rgba(11, 31, 58, 0.25);
+  --action-lift: 0 12px 24px -14px rgba(30, 64, 175, 0.7);
+  --lit-edge: inset 0 1.5px 0 rgba(255, 255, 255, 0.35);
+  --r-pill: 999px; --r-plate: 24px; --r-tile: 18px; --r-bar: 10px;
+  --gutter: clamp(20px, 4vw, 48px); --gap: 24px; --gap-s: 16px; --gap-xs: 8px; --rail-w: 340px;
+  --font: 'Inter Variable', Inter, system-ui, sans-serif; --script: 'Homemade Apple', cursive;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --you: var(--blue); --peer-1: var(--navy); --peer-2: var(--navy-light); --peer-3: var(--muted);
+  color-scheme: light;
+}
+body { margin: 0; background: var(--white); color: var(--navy); font: 400 18px/1.5 var(--font);
+  font-feature-settings: 'cv11'; -webkit-font-smoothing: antialiased; }
+.num, time { font-feature-settings: 'cv11', 'tnum'; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }

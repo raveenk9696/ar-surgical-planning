@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Mark up one scan together: a 2026 rebuild</title>
+    <meta name="description" content="A 2026 rebuild of a 2022 lab app: several people view and annotate one CT scan's 3D model together, in the browser or in AR." />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+  </head>
+  <body>
+    <div class="wash" aria-hidden="true"></div>
+    <canvas id="stage" role="img" aria-label="3D model of a CT scan: bone inside a glass skin"></canvas>
+
+    <div id="model-error" class="tile" role="alert" hidden>
+      <p id="model-error-text"></p>
+      <button id="btn-reload" class="btn secondary" type="button">Reload</button>
+    </div>
+    <div id="progress" class="progress" role="progressbar" aria-label="Loading the scan" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <span class="progress-label">Loading the scan</span>
+      <span class="progress-track"><i></i></span>
+    </div>
+
+    <header class="title-block">
+      <h1>Mark up one scan <span class="title-note">together</span></h1>
+      <p class="lead">A 2026 rebuild of a 2022 lab app.</p>
+      <p class="credit">CT from TCIA (Saltz et al. 2021), CC BY 4.0. Not for clinical use. <button id="about-open" class="link" type="button">About</button></p>
+      <div id="status" class="status" role="status" aria-live="polite" hidden></div>
+      <p id="notice" class="notice" hidden></p>
+    </header>
+
+    <button id="people-dots" class="dots" type="button" aria-label="People"></button>
+
+    <div class="controls">
+      <div class="dock" role="toolbar" aria-label="Viewer controls">
+        <button id="btn-skin" class="chip toggle" type="button" role="switch" aria-checked="true" aria-label="Skin"><span class="label">Skin on</span></button>
+        <button id="btn-add" class="chip" type="button" aria-pressed="false"><span class="label">Add note</span></button>
+        <button id="btn-reset" class="chip desktop-only" type="button"><span class="label">Reset view</span></button>
+        <button id="btn-notes" class="chip mobile-only" type="button" aria-haspopup="dialog"><span class="label">Notes <span class="num" id="notes-badge">0</span></span></button>
+      </div>
+      <div class="actions">
+        <div class="action">
+          <button id="btn-share" class="btn secondary" type="button"><span class="label">Share</span></button>
+          <button id="btn-second" class="textbtn" type="button" hidden>Open in a second tab</button>
+        </div>
+        <div class="action">
+          <button id="btn-ar" class="btn primary" type="button" aria-disabled="true"><span class="label">View in AR</span></button>
+          <p id="ar-help" class="helper" hidden>Open on Quest, Android Chrome or HoloLens 2.</p>
+        </div>
+      </div>
+    </div>
+    <p id="hint" class="hint">Drag to rotate. Scroll to zoom.</p>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <aside id="rail" class="rail" aria-label="People and notes">
+      <button id="sheet-close" class="sheet-close" type="button" aria-label="Close"></button>
+      <section class="plate people" aria-labelledby="people-title">
+        <h2 id="people-title">People</h2>
+        <ul id="people-list" class="people-list"></ul>
+        <div id="people-empty" class="empty">
+          <p>Just you. Open this page in a second tab to see a second person.</p>
+          <button id="btn-open-second" class="textbtn" type="button">Open second tab</button>
+        </div>
+      </section>
+      <section class="plate notes" aria-labelledby="notes-title">
+        <h2 id="notes-title">Notes <span id="notes-count" class="num">0</span></h2>
+        <ul id="notes-list" class="notes-list"></ul>
+        <p id="notes-empty" class="empty-note">No notes yet. Choose Add note, then tap the scan.</p>
+      </section>
+    </aside>
+
+    <form id="note-form" class="note-form" hidden autocomplete="off">
+      <input id="note-input" type="text" maxlength="24" placeholder="Write 1-3 words" aria-label="Note text" enterkeyhint="done" />
+    </form>
+
+    <div id="ar-overlay" class="ar-overlay" hidden>
+      <div class="ar-bar" role="toolbar" aria-label="AR controls">
+        <button id="ar-skin" class="chip toggle" type="button" role="switch" aria-checked="true" aria-label="Skin"><span class="label">Skin on</span></button>
+        <button id="ar-move" class="chip" type="button"><span class="label">Move model</span></button>
+        <button id="ar-size" class="chip" type="button"><span class="label">Size</span></button>
+        <button id="ar-exit" class="chip" type="button"><span class="label">Exit</span></button>
+      </div>
+      <div id="ar-presets" class="ar-bar" role="group" aria-label="Note presets"></div>
+    </div>
+
+    <dialog id="about" class="about" aria-labelledby="about-title">
+      <form method="dialog" class="about-body">
+        <h2 id="about-title">About this page</h2>
+        <p>In 2018-2022, in a Penn radiology lab, I built a pipeline that turns a CT scan into 3D bone and skin models for a HoloLens, then led a lab team that grew it into a web app where several people view and annotate a scan's 3D model together in AR. That app is not in this repository. This page rebuilds the idea from scratch in 2026.</p>
+        <p>Paper: Kariyawasam et al., "Automated medical image based anatomical point cloud generation for collaborative real-time augmented reality applications", SPIE Medical Imaging 2022. <a href="https://doi.org/10.1117/12.2612993" target="_blank" rel="noopener noreferrer">doi:10.1117/12.2612993</a></p>
+        <p>Code: <a href="https://github.com/raveenk9696/ar-surgical-planning" target="_blank" rel="noopener noreferrer">github.com/raveenk9696/ar-surgical-planning</a></p>
+        <p>CT scan: Saltz et al. (2021), Stony Brook University COVID-19 Positive Cases, The Cancer Imaging Archive, <a href="https://doi.org/10.7937/TCIA.BBAG-2923" target="_blank" rel="noopener noreferrer">doi:10.7937/TCIA.BBAG-2923</a>, CC BY 4.0. Changes: converted to bone and skin surfaces, skin cropped below the hips, simplified for the web.</p>
+        <p>No accounts and no server of ours. Notes live in the browsers that have this link; this browser keeps them 24 hours. Anyone with the link can see, add and delete notes. To connect two browsers, public Nostr relays carry encrypted connection data; relays and the STUN servers (Google, Cloudflare) can see your IP address. Please do not type patient data.</p>
+        <p>Fonts: Inter (SIL OFL 1.1) and Homemade Apple (Apache 2.0). <a href="%BASE_URL%LICENSES.txt" target="_blank" rel="noopener noreferrer">Licenses</a></p>
+        <button id="about-close" class="btn secondary" type="submit" value="close">Close</button>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
