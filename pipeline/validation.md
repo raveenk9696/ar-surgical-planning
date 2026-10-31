@@ -31,3 +31,8 @@ A fresh TCIA abdomen download passed all 189 per-file SHA256 checks.
 `pipeline/samples.json` records the 189 abdomen and 267 legs file hashes, licenses, and dataset citations.
 Abdomen attribution is Saltz et al. (2021), doi:10.7937/TCIA.BBAG-2923, CC BY 4.0.
 Legs attribution is Vallières et al. (2015), doi:10.7937/K9/TCIA.2015.7GO2GSKS, CC BY 3.0.
+
+A fresh uv environment with Python 3.12.11 installed `pipeline/requirements-dev.txt`.
+All 12 synthetic tests passed in 13.23 seconds with external pytest plugins disabled.
+Both real default point clouds were regenerated with the final code and were byte-identical
+to the inspected outputs. The explicit bone-only HU threshold also has a red-to-green regression test.

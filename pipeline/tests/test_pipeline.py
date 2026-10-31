@@ -189,3 +189,10 @@ def test_point_budget_is_deterministic(tmp_path):
     assert 0 < len(first) <= 1200
     np.testing.assert_array_equal(first, run_pipeline(tmp_path, 0.1, "--max-points", 1200)[1])
     assert np.any(first[:, 3] == 255)
+
+
+def test_hu_threshold_keeps_thin_bone_inside_the_body(tmp_path):
+    write_series(tmp_path, [f"{z}.dcm" for z in range(DEPTH)])
+    points = run_pipeline(tmp_path, 0.1, "--threshold-hu", 600)[1]
+    assert len(points) > 0
+    assert np.all(points[:, 3] >= 204)
