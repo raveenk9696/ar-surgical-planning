@@ -55,7 +55,7 @@ export async function createNostrTransport(token: string, relays: readonly strin
       const startedAt = Date.now();
       setNet('connecting');
       room = joinRoom(
-        { appId: APP_ID, password: secret, relayConfig: { urls: [...relays] } },
+        { appId: APP_ID, maxReceiveBytes: 512 * 1024, password: secret, relayConfig: { urls: [...relays] } },
         roomId,
         { onJoinError: () => setNet('blocked') },
       );
