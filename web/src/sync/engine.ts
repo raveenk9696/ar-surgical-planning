@@ -1,7 +1,7 @@
 import { LIMITS } from '../config';
 import type { Link, Transport } from '../net/transport';
 import type { AddResult, Digest, Mesh, Note, NoteId, Peer, PeerId, Presence, RoomState, Vec3, Wire } from '../types';
-import { signNote, signDeletion, type Identity } from './identity';
+import { canonicalNote, signNote, signDeletion, type Identity } from './identity';
 import { loadCache, saveCache } from './cache';
 import { createLimiter } from './limiter';
 import { digestOf, mergeNote } from './notes';
@@ -184,6 +184,7 @@ export function createEngine(o: {
   let lastSnapshotAt = -Infinity;
   let cacheDirtyAt: number | null = null;
   let newerReported = false;
+  const pendingLinks = new Map<Link, number>();
   const noteLinks = new Map<NoteId, string>();
   const identities = new Map<PeerId, { link: Link; seenAt: number }>();
   const linkPeers = new Map<Link, PeerId>();
@@ -271,12 +272,39 @@ export function createEngine(o: {
       if (link !== 'tab') linkPeers.set(link, from);
     }
     if (signed) {
-      if (pendingVerifications >= 32) return;
-      pendingVerifications++;
+      const counts = new Map<string, number>();
+      for (const owner of noteLinks.values()) counts.set(owner, (counts.get(owner) ?? 0) + 1);
+      let candidateState = state.notes;
+      const notes: Note[] = [];
+      for (const n of msg.k === 'note' ? [msg.note] : msg.notes) {
+        const prev = state.notes.get(n.id);
+        if (prev && canonicalNote(prev) === canonicalNote(n) && prev.deleted === n.deleted) continue;
+        const owner = link === 'tab' ? `tab:${n.author.id}` : link;
+        if (noteLinks.get(n.id) !== owner) {
+          const count = counts.get(owner) ?? 0;
+          if (count >= LIMITS.perAuthor) continue;
+          counts.set(owner, count + 1);
+        }
+        const candidate = mergeNotes(candidateState, [n]);
+        if (!candidate.has(n.id)) continue;
+        candidateState = candidate;
+        notes.push(n);
+        if (notes.length === LIMITS.perAuthor) break;
+      }
+      if (!notes.length || pendingVerifications + notes.length > 640) return;
+      const pending = pendingLinks.get(link) ?? 0;
+      if (pending + notes.length > LIMITS.perAuthor) return;
+      pendingLinks.set(link, pending + notes.length);
+      pendingVerifications += notes.length;
       const epoch = generation;
-      void verifyWire(msg).then((verified) => {
+      void verifyWire({ v: 2, k: 'snapshot', from, notes }).then((verified) => {
         if (running && epoch === generation) accept(verified, link);
-      }).finally(() => { pendingVerifications--; });
+      }).finally(() => {
+        pendingVerifications -= notes.length;
+        const remaining = (pendingLinks.get(link) ?? 0) - notes.length;
+        if (remaining) pendingLinks.set(link, remaining);
+        else pendingLinks.delete(link);
+      });
     } else accept(msg, link);
   }
 
