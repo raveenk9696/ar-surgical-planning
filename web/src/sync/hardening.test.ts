@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { FakeHub } from '../test/fakehub';
-import { identity, noteBy, peer, settle } from '../test/signed';
+import { identity, noteBy, peer, settle, run } from '../test/signed';
 import { createEngine } from './engine';
 import type { Note } from '../types';
 
@@ -160,4 +160,39 @@ it('authenticates the first presence on a shared tab link despite an unsigned hi
   await settle();
   expect(engine.state.peers.get(peer('V').id)?.seenAt).toBe(seen);
   engine.stop();
+});
+
+
+it.each([21, 35])('E5/E6 syncs %i records from one honest link, including deletions', async (total) => {
+  const { engine, end } = setup();
+  await engine.start();
+  const notes = Array.from({ length: total }, (_, i) => noteBy('B', i + 1, { deleted: i < total - 20 }));
+  for (let i = 0; i < 4; i++) {
+    end.inject(snapshot(notes), 'nostr:honest');
+    await settle();
+    vi.advanceTimersByTime(2100);
+  }
+  expect(engine.state.notes.size).toBe(total);
+  expect([...engine.state.notes.values()].filter((n) => !n.deleted)).toHaveLength(20);
+  engine.stop();
+});
+
+
+it.each([21, 35])('E5/E6 late joiner converges on %i records through one relay peer', async (total) => {
+  const hub = new FakeHub();
+  const a = createEngine({ token: 'ABCDEFGHIJKLMNOPQRST', identity: identity('A'), transport: hub.end('A'), now: Date.now });
+  const b = createEngine({ token: 'ABCDEFGHIJKLMNOPQRST', identity: identity('B'), transport: hub.end('B'), now: Date.now });
+  await a.start();
+  for (let i = 0; i < total; i++) {
+    const added = await a.addNote({ pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: `note ${i}` });
+    if (!added.ok) throw new Error('add failed');
+    if (i < total - 20) await a.deleteNote(added.id);
+    await run(1100);
+  }
+  await b.start();
+  await run(10000);
+  expect(b.state.notes).toEqual(a.state.notes);
+  expect(b.state.notes.size).toBe(total);
+  a.stop();
+  b.stop();
 });

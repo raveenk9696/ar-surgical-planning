@@ -518,12 +518,11 @@ describe('link limits', () => {
     expect(a.engine.state.notes.size).toBe(5);
   });
 
-  it('keeps the live-note quota across identity changes and expiry', async () => {
+  it('keeps the verified author live-note quota across link changes and expiry', async () => {
     const a = mk(new FakeHub(), 'A');
     await a.engine.start();
     for (let i = 1; i <= 21; i++) {
-      const c = i <= 10 ? 'B' : 'C';
-      a.end.inject({ v: 2, k: 'note', from: peer(c).id, note: noteBy(c, i) }, 'nostr:one');
+      a.end.inject({ v: 2, k: 'note', from: peer('B').id, note: noteBy('B', i) }, `nostr:link${i}`);
       await run(8200);
     }
     await settle();

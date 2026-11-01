@@ -190,7 +190,6 @@ export function createEngine(o: {
   let cacheDirtyAt: number | null = null;
   let newerReported = false;
   const pendingLinks = new Map<Link, number>();
-  const noteLinks = new Map<NoteId, string>();
   const identities = new Map<PeerId, { link: Link; seenAt: number; authenticated: boolean }>();
   const pendingPresence = new Set<Link>();
   const linkPeers = new Map<Link, PeerId>();
@@ -212,7 +211,6 @@ export function createEngine(o: {
     if (next.notes !== prev.notes) {
       for (const [id, n] of next.notes) if (prev.notes.get(id) !== n) notes.push(id);
       for (const id of prev.notes.keys()) if (!next.notes.has(id)) notes.push(id);
-      for (const id of noteLinks.keys()) if (!next.notes.has(id)) noteLinks.delete(id);
     }
     const peers = !samePeers(prev.peers, next.peers);
     const link = prev.link !== next.link || prev.netPeers !== next.netPeers;
@@ -303,25 +301,17 @@ export function createEngine(o: {
       pendingPresence.add(link);
       const epoch = generation;
       void verifyPresence(msg, roomId).then((valid) => {
-        if (valid && running && epoch === generation && bindPresence(msg, link, true)) accept(msg, link);
+        if (valid && running && epoch === generation && bindPresence(msg, link, true)) accept(msg);
       }).finally(() => pendingPresence.delete(link));
       return;
     }
     if (!signed && !bindPresence(msg, link, false)) return;
     if (signed) {
-      const counts = new Map<string, number>();
-      for (const owner of noteLinks.values()) counts.set(owner, (counts.get(owner) ?? 0) + 1);
       let candidateState = state.notes;
       const notes: Note[] = [];
       for (const n of msg.k === 'note' ? [msg.note] : msg.notes) {
         const prev = state.notes.get(n.id);
         if (prev && canonicalNote(prev) === canonicalNote(n) && prev.deleted === n.deleted && (prev.deleted || n.deleted || canonicalContent(prev) === canonicalContent(n))) continue;
-        const owner = link === 'tab' ? `tab:${n.author.id}` : link;
-        if (noteLinks.get(n.id) !== owner) {
-          const count = counts.get(owner) ?? 0;
-          if (count >= LIMITS.perAuthor) continue;
-          counts.set(owner, count + 1);
-        }
         const candidate = mergeNotes(candidateState, [n], self.id);
         if (!candidate.has(n.id)) continue;
         candidateState = candidate;
@@ -335,34 +325,36 @@ export function createEngine(o: {
       pendingVerifications += notes.length;
       const epoch = generation;
       void verifyWire({ v: 2, k: 'snapshot', from, notes }, roomId).then((verified) => {
-        if (running && epoch === generation) accept(verified, link);
+        if (running && epoch === generation) accept(verified);
       }).finally(() => {
         pendingVerifications -= notes.length;
         const remaining = (pendingLinks.get(link) ?? 0) - notes.length;
         if (remaining) pendingLinks.set(link, remaining);
         else pendingLinks.delete(link);
       });
-    } else accept(msg, link);
+    } else accept(msg);
   }
 
-  function accept(msg: Wire, link: Link): void {
+  function accept(msg: Wire): void {
     const from = senderOf(msg);
     const t = now();
     let accepted = msg;
     if (msg.k === 'note' || msg.k === 'snapshot') {
-      const counts = new Map<string, number>();
-      for (const owner of noteLinks.values()) counts.set(owner, (counts.get(owner) ?? 0) + 1);
+      const counts = new Map<PeerId, { live: number; total: number }>();
+      for (const n of state.notes.values()) {
+        const count = counts.get(n.author.id) ?? { live: 0, total: 0 };
+        count.total++;
+        if (!n.deleted) count.live++;
+        counts.set(n.author.id, count);
+      }
       const notes = (msg.k === 'note' ? [msg.note] : msg.notes).filter((n) => {
         const prev = state.notes.get(n.id);
-        if (prev && !mergeNote(prev, n).changed) return true;
-        const owner = link === 'tab' ? `tab:${n.author.id}` : link;
-        const previousOwner = noteLinks.get(n.id);
-        if (previousOwner === owner) return true;
-        const count = counts.get(owner) ?? 0;
-        if (count >= LIMITS.perAuthor) return false;
-        if (previousOwner) counts.set(previousOwner, (counts.get(previousOwner) ?? 1) - 1);
-        noteLinks.set(n.id, owner);
-        counts.set(owner, count + 1);
+        if (prev) return true;
+        const count = counts.get(n.author.id) ?? { live: 0, total: 0 };
+        if (count.total >= LIMITS.maxRecords || !n.deleted && count.live >= LIMITS.perAuthor) return false;
+        count.total++;
+        if (!n.deleted) count.live++;
+        counts.set(n.author.id, count);
         return true;
       });
       if (msg.k === 'note') {
@@ -370,7 +362,6 @@ export function createEngine(o: {
       } else accepted = { ...msg, notes };
     }
     const { state: next, out } = reduce(state, accepted, t);
-    for (const id of noteLinks.keys()) if (!next.notes.has(id)) noteLinks.delete(id);
     if (msg.k === 'bye') unbind(from);
     const notesChanged = next.notes !== state.notes;
     commit(next);
