@@ -1,6 +1,6 @@
 # AR surgical planning
 
-Turn a CT scan into 3D models of bone and skin, then mark them up together in a web browser or in AR.
+Turn a CT scan into 3D models of bone and skin, then mark them up together in a web browser, with AR on browsers that support WebXR.
 
 **Demo URL after publication:** https://raveenk9696.github.io/ar-surgical-planning/ (open it in a second tab to watch notes and pointers sync)
 
@@ -52,7 +52,10 @@ Run the pipeline commands above first. `AR_MODEL_SRC=../abdomen.glb` connects th
 
 To build a local preview from `web/`, run these commands.
 `npm run build` packs the model from `AR_MODEL_SRC` and repacks it when the source file changes.
-`AR_MODEL_SRC` is required. There is no default path.
+Set `AR_MODEL_SRC` for the first build. There is no default path.
+Without a packed model, `npm run build` fails if `AR_MODEL_SRC` is unset.
+It also fails if `AR_MODEL_SRC` names a missing file.
+Later builds can use the packed model with `AR_MODEL_SRC` unset.
 
 ```sh
 AR_MODEL_SRC=../abdomen.glb npm run build
@@ -98,7 +101,7 @@ The work was done in Dr Chamith Rajapakse's lab at the University of Pennsylvani
 
 ## Data
 
-This repository holds no patient data. The lab's old private repositories held a CT scan, and it is not part of this history.
+This repository holds no patient data.
 
 The demo shows the abdomen scan from The Cancer Imaging Archive. Legs is a second sample for the pipeline only. CI downloads the abdomen scan at build time. The site ships bone and skin surfaces made from it.
 
@@ -112,3 +115,4 @@ Do not use these scans to identify anyone. This software is not for clinical use
 MIT, see [LICENSE](LICENSE). Commits before `eba824e` hold a `generator.py` adapted from img2ply. Those versions of that file are GPL-3.0.
 
 The TCIA-derived demo mesh is CC BY 4.0. The fonts use OFL 1.1 and Apache 2.0.
+The web page also bundles MIT-licensed libraries. Their notices ship in `LICENSES.txt` on the site.
