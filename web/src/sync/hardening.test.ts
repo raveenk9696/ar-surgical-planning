@@ -57,3 +57,19 @@ it('erases deleted content from state, cache and outgoing wire records', async (
   expect(reloaded.engine.state.notes.get(added.id)).toEqual(dead);
   reloaded.engine.stop();
 });
+
+it('C5 keeps local notes and permits another add after five Sybil links fill the room', async () => {
+  const { engine, end } = setup();
+  await engine.start();
+  const add = (text: string) => engine.addNote({ pos: [1, 2, 3] as const, nrm: [0, 0, 1] as const, mesh: 'bone', text });
+  const first = await add('mine 1');
+  await add('mine 2');
+  for (const c of 'BCDEF') {
+    end.inject(snapshot(Array.from({ length: 20 }, (_, i) => noteBy(c, i + 1, { created: Date.now() - 24 * 3600_000 + 1000 }))), `nostr:${c}`);
+    await settle();
+  }
+  expect(first.ok && engine.state.notes.has(first.id)).toBe(true);
+  expect((await add('mine 3')).ok).toBe(true);
+  expect(engine.state.notes.size).toBeLessThanOrEqual(100);
+  engine.stop();
+});

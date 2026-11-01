@@ -577,7 +577,7 @@ it('converges three replicas after concurrent adds at 99 notes with loss, duplic
     await settle();
     expect((await add(engine)).ok).toBe(true);
     await settle();
-    expect((await add(engine))).toEqual({ ok: false, why: 'full' });
+    expect((await add(engine)).ok).toBe(true);
   }
   hub.duplicate = true;
   hub.dropEvery = 3;

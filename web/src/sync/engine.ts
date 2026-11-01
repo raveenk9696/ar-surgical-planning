@@ -41,7 +41,7 @@ function digestOfMap(notes: ReadonlyMap<NoteId, Note>): Digest {
 
 const sameDigest = (a: Digest, b: Digest): boolean => a.n === b.n && a.h === b.h;
 
-export function mergeNotes(notes: ReadonlyMap<NoteId, Note>, incoming: readonly Note[]): ReadonlyMap<NoteId, Note> {
+export function mergeNotes(notes: ReadonlyMap<NoteId, Note>, incoming: readonly Note[], protectedAuthor?: PeerId): ReadonlyMap<NoteId, Note> {
   let next: Map<NoteId, Note> | null = null;
   for (const note of incoming) {
     const base = next ?? notes;
@@ -53,7 +53,13 @@ export function mergeNotes(notes: ReadonlyMap<NoteId, Note>, incoming: readonly 
   }
   if (!next) return notes;
   if (next.size > LIMITS.maxRecords || liveCount(next) > LIMITS.maxLive) {
-    const ordered = [...next.values()].sort((a, b) => Number(a.deleted) - Number(b.deleted) || a.created - b.created || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const ordered = [...next.values()].sort((a, b) => {
+      const own = Number(b.author.id === protectedAuthor) - Number(a.author.id === protectedAuthor);
+      const kind = Number(a.deleted) - Number(b.deleted);
+      const age = a.deleted ? a.created - b.created : b.created - a.created;
+      const sequence = a.deleted ? 0 : Number(a.id.split('.')[1]) - Number(b.id.split('.')[1]);
+      return own || kind || age || sequence || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    });
     let live = 0;
     next = new Map(ordered.filter((n) => n.deleted || ++live <= LIMITS.maxLive).slice(0, LIMITS.maxRecords).map((n) => [n.id, n]));
   }
@@ -103,7 +109,7 @@ export function reduce(s: RoomState, msg: Wire, now: number): { state: RoomState
     }
     case 'note':
     case 'snapshot': {
-      const notes = mergeNotes(s.notes, msg.k === 'note' ? [msg.note] : msg.notes);
+      const notes = mergeNotes(s.notes, msg.k === 'note' ? [msg.note] : msg.notes, s.self.id);
       const peers = touch(s.peers, msg.from, now);
       return { state: notes === s.notes && peers === s.peers ? s : { ...s, notes, peers }, out: [] };
     }
@@ -285,7 +291,7 @@ export function createEngine(o: {
           if (count >= LIMITS.perAuthor) continue;
           counts.set(owner, count + 1);
         }
-        const candidate = mergeNotes(candidateState, [n]);
+        const candidate = mergeNotes(candidateState, [n], self.id);
         if (!candidate.has(n.id)) continue;
         candidateState = candidate;
         notes.push(n);
@@ -355,7 +361,7 @@ export function createEngine(o: {
   }
 
   function localNote(note: Note): void {
-    commit({ ...state, notes: mergeNotes(state.notes, [note]) });
+    commit({ ...state, notes: mergeNotes(state.notes, [note], self.id) });
     send({ v: 2, k: 'note', from: self.id, note });
     cacheDirtyAt ??= now();
   }
@@ -374,7 +380,7 @@ export function createEngine(o: {
       const text = Array.from(normalized.replace(/\s+/g, ' ').trim()).slice(0, LIMITS.textMax).join('');
       if (!text) return { ok: false, why: 'empty' };
       const { notes } = state;
-      if (liveCount(notes) >= LIMITS.maxLive || liveCount(notes, self.id) >= LIMITS.perAuthor) {
+      if (liveCount(notes, self.id) >= LIMITS.perAuthor || [...notes.values()].filter((n) => n.author.id === self.id).length >= LIMITS.maxRecords) {
         return { ok: false, why: 'full' };
       }
       if (!ownNotes.take('self')) return { ok: false, why: 'rate' };
@@ -406,7 +412,7 @@ export function createEngine(o: {
       if (o.storage) {
         const cached = await loadCache(roomId, o.storage, now());
         if (!running || epoch !== generation) return;
-        commit({ ...state, notes: mergeNotes(state.notes, cached) });
+        commit({ ...state, notes: mergeNotes(state.notes, cached, self.id) });
         for (const n of state.notes.values()) if (n.author.id === self.id) counter = Math.max(counter, Number(n.id.split('.')[1]));
       }
       startedAt = now();
