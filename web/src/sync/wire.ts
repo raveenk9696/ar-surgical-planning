@@ -4,8 +4,8 @@ import type { Digest, Mesh, Note, Peer, Vec3, Wire } from '../types';
 
 type Obj = Record<string, unknown>;
 
-const PEER_ID = /^[A-Z2-7]{8}$/;
-const NOTE_ID = /^[A-Z2-7]{8}\.\d{1,9}$/;
+const PEER_ID = /^[A-Z2-7]{26}$/;
+const NOTE_ID = /^[A-Z2-7]{26}\.\d{1,9}$/;
 const FORBIDDEN_KEYS = ['__proto__', 'constructor', 'prototype'];
 const NAME_MAX = 16;
 export function isSafeText(value: string): boolean {
@@ -67,7 +67,7 @@ function note(x: unknown, now: number): Note | null {
   const created = typeof x.created === 'number' && Number.isFinite(x.created) && x.created >= now - LIMITS.maxNoteAgeMs && x.created <= now + LIMITS.maxClockSkewMs ? x.created : null;
   const deleted = typeof x.deleted === 'boolean' ? x.deleted : null;
   if (!id || !pos || !nrm || !mesh || !author || created === null || deleted === null) return null;
-  if (id.slice(0, 8) !== author.id) return null;
+  if (id.slice(0, 26) !== author.id) return null;
   const body = text(x.text, 1, LIMITS.textMax);
   if (typeof x.publicKey !== 'string' || !/^[A-Za-z0-9_-]{87}$/.test(x.publicKey)) return null;
   if (typeof x.signature !== 'string' || !/^[A-Za-z0-9_-]{86}$/.test(x.signature)) return null;

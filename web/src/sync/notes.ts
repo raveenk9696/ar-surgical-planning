@@ -12,6 +12,7 @@ export function fnv32(s: string): number {
 
 export function mergeNote(a: Note | undefined, b: Note): { note: Note; changed: boolean } {
   if (!a) return { note: b, changed: true };
+  if (a.publicKey !== b.publicKey) return { note: a, changed: false };
   const winner = canonicalNote(a) <= canonicalNote(b) ? a : b;
   const deletion = a.deletion && b.deletion ? (a.deletion.signature < b.deletion.signature ? a.deletion : b.deletion) : a.deletion ?? b.deletion;
   const deleted = a.deleted || b.deleted;

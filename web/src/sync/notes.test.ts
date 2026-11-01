@@ -4,8 +4,8 @@ import type { Note } from '../types';
 import { digestOf, mergeNote } from './notes';
 
 const AUTHORS = [
-  { id: 'AAAAAAAA', name: 'Guest 2' },
-  { id: 'BBBBBBBB', name: 'Guest 3' },
+  { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', name: 'Guest 2' },
+  { id: 'BBBBBBBBBBBBBBBBBBBBBBBBBB', name: 'Guest 3' },
 ];
 
 const noteArb: fc.Arbitrary<Note> = fc
@@ -75,7 +75,7 @@ describe('mergeNote', () => {
   });
 
   it('keeps a tombstone that arrives before its create', () => {
-    const create: Note = { id: 'AAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
+    const create: Note = { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
     const tomb: Note = { ...create, deleted: true };
     const first = mergeNote(undefined, tomb).note;
     const after = mergeNote(first, create);
@@ -85,7 +85,7 @@ describe('mergeNote', () => {
   });
 
   it('chooses immutable fields deterministically and ORs conflicting tombstones', () => {
-    const a: Note = { id: 'AAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
+    const a: Note = { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
     const b: Note = { ...a, pos: [9, 9, 9], text: 'rib' };
     expect(mergeNote(a, b).note).toBe(a);
     expect(mergeNote(b, a).note).toEqual(a);
@@ -96,7 +96,7 @@ describe('mergeNote', () => {
   });
 
   it('does not let a stale live copy resurrect a deleted note', () => {
-    const live: Note = { id: 'AAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
+    const live: Note = { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA.1', pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', author: AUTHORS[0]!, created: 5, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
     const dead = mergeNote(live, { ...live, deleted: true }).note;
     expect(mergeNote(dead, live).note.deleted).toBe(true);
   });
@@ -110,8 +110,14 @@ describe('digestOf', () => {
         expect(digestOf(unique)).toEqual(digestOf([...unique].reverse()));
       }),
     );
-    const n: Note = { id: 'AAAAAAAA.1', pos: [0, 0, 0], nrm: [0, 0, 1], mesh: 'bone', text: 'a', author: AUTHORS[0]!, created: 1, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
+    const n: Note = { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA.1', pos: [0, 0, 0], nrm: [0, 0, 1], mesh: 'bone', text: 'a', author: AUTHORS[0]!, created: 1, deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
     expect(digestOf([n])).not.toEqual(digestOf([{ ...n, deleted: true }]));
     expect(digestOf([])).toEqual({ n: 0, h: 0 });
   });
+});
+
+it('never combines a deletion from another key with a stored signature', () => {
+  const live = { id: 'A'.repeat(26) + '.1', author: { id: 'A'.repeat(26), name: 'Guest' }, pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'hip', created: 1, deleted: false, deletion: null, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86) } as Note;
+  const tomb = { ...live, deleted: true, publicKey: 'B'.repeat(87), deletion: { id: live.id, signature: 'B'.repeat(86) } };
+  expect(mergeNote(live, tomb)).toEqual({ note: live, changed: false });
 });

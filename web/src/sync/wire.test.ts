@@ -3,17 +3,17 @@ import { describe, expect, it } from 'vitest';
 import type { Note, Wire } from '../types';
 import { decode, isNewerVersion } from './wire';
 
-const peer = { id: 'AAAAAAAA', name: 'Guest 2' };
-const note: Note = { id: 'AAAAAAAA.1', pos: [10, -20, -300], nrm: [0, -1, 0], mesh: 'bone', text: 'left hip', author: peer, created: Date.now(), deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
+const peer = { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', name: 'Guest 2' };
+const note: Note = { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA.1', pos: [10, -20, -300], nrm: [0, -1, 0], mesh: 'bone', text: 'left hip', author: peer, created: Date.now(), deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
 const digest = { n: 1, h: 123 };
 const valid: Wire[] = [
   { v: 2, k: 'hello', from: peer, digest },
-  { v: 2, k: 'snapshot', from: 'AAAAAAAA', notes: [note] },
-  { v: 2, k: 'note', from: 'AAAAAAAA', note },
-  { v: 2, k: 'note', from: 'AAAAAAAA', note: { ...note, deleted: true, deletion: { id: note.id, signature: 'A'.repeat(86) } } },
+  { v: 2, k: 'snapshot', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', notes: [note] },
+  { v: 2, k: 'note', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', note },
+  { v: 2, k: 'note', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', note: { ...note, deleted: true, deletion: { id: note.id, signature: 'A'.repeat(86) } } },
   { v: 2, k: 'presence', from: peer, seq: 4, ptr: [1, 2, 3], away: false, digest },
   { v: 2, k: 'presence', from: peer, seq: 0, ptr: null, away: true, digest },
-  { v: 2, k: 'bye', from: 'AAAAAAAA' },
+  { v: 2, k: 'bye', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA' },
 ];
 
 const clone = (w: unknown): Record<string, unknown> => JSON.parse(JSON.stringify(w)) as Record<string, unknown>;
@@ -30,10 +30,10 @@ describe('decode', () => {
     ['an array', [1, 2]],
     ['a number', 7],
     ['wrong version', { ...clone(valid[6]), v: 3 }],
-    ['no version', { k: 'bye', from: 'AAAAAAAA' }],
-    ['unknown kind', { v: 2, k: 'nope', from: 'AAAAAAAA' }],
+    ['no version', { k: 'bye', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA' }],
+    ['unknown kind', { v: 2, k: 'nope', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA' }],
     ['extra key', { ...clone(valid[6]), extra: 1 }],
-    ['__proto__ key', JSON.parse('{"v":2,"k":"bye","from":"AAAAAAAA","__proto__":{"x":1}}')],
+    ['__proto__ key', JSON.parse('{"v":2,"k":"bye","from":"AAAAAAAAAAAAAAAAAAAAAAAAAA","__proto__":{"x":1}}')],
     ['constructor key', { ...clone(valid[6]), constructor: 1 }],
     ['bad peer id', { v: 2, k: 'bye', from: 'short' }],
     ['NaN coordinate', withNote({ pos: [Number.NaN, 0, 0] })],
@@ -46,19 +46,19 @@ describe('decode', () => {
     ['empty live text', withNote({ text: '' })],
     ['text on a tombstone', withNote({ deleted: true })],
     ['control character', withNote({ text: 'a\u0000b' })],
-    ['author not matching the id', withNote({ author: { id: 'BBBBBBBB', name: 'x' } })],
+    ['author not matching the id', withNote({ author: { id: 'BBBBBBBBBBBBBBBBBBBBBBBBBB', name: 'x' } })],
     ['bad mesh', withNote({ mesh: 'liver' })],
     ['pos with 2 numbers', withNote({ pos: [1, 2] })],
     ['presence seq negative', { ...clone(valid[4]), seq: -1 }],
     ['presence seq fraction', { ...clone(valid[4]), seq: 1.5 }],
     ['digest too large', { ...clone(valid[0]), digest: { n: 1000, h: 0 } }],
-    ['name too long', { ...clone(valid[0]), from: { id: 'AAAAAAAA', name: 'x'.repeat(17) } }],
+    ['name too long', { ...clone(valid[0]), from: { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', name: 'x'.repeat(17) } }],
   ])('rejects %s', (_name, raw) => {
     expect(decode(raw)).toBeNull();
   });
 
   it('rejects a snapshot of 301 notes and accepts 300', () => {
-    const many = (n: number): unknown => ({ v: 2, k: 'snapshot', from: 'AAAAAAAA', notes: Array.from({ length: n }, (_, i) => ({ ...clone(note), id: `AAAAAAAA.${i + 1}` })) });
+    const many = (n: number): unknown => ({ v: 2, k: 'snapshot', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', notes: Array.from({ length: n }, (_, i) => ({ ...clone(note), id: `AAAAAAAAAAAAAAAAAAAAAAAAAA.${i + 1}` })) });
     expect(decode(many(301))).toBeNull();
     expect(decode(many(300))).not.toBeNull();
   });

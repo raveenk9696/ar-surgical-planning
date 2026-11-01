@@ -11,7 +11,7 @@ for (const c of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
   const key = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const jwk = key.publicKey.export({ format: 'jwk' });
   const raw = Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x!, 'base64url'), Buffer.from(jwk.y!, 'base64url')]);
-  const bits = [...createHash('sha256').update(raw).digest().subarray(0, 5)].map((n) => n.toString(2).padStart(8, '0')).join('');
+  const bits = [...createHash('sha256').update(raw).digest().subarray(0, 16)].map((n) => n.toString(2).padStart(8, '0')).join('') + '00';
   const id = bits.match(/.{5}/g)!.map((b) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'[parseInt(b, 2)]).join('');
   const privateKey = await crypto.subtle.importKey('jwk', key.privateKey.export({ format: 'jwk' }), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
   identities.set(c, { peer: { id, name: `Guest ${c}` }, publicKey: raw.toString('base64url'), privateKey });

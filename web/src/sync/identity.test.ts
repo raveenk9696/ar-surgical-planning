@@ -39,3 +39,16 @@ it.each([1e16, Date.now() - 25 * 3600_000 - 1000, Date.now() + 120_000 + 1000])(
   expect(decode({ v: 2, k: 'note', from: n.author.id, note: n })).toBeNull();
   expect(await loadCache('ROOM', { getItem: () => JSON.stringify({ savedAt: Date.now(), notes: [n] }) }, Date.now())).toEqual([]);
 });
+
+it('separates the verifier 40-bit collision at the full 128-bit width', async () => {
+  const keys = [
+    '04c65177dd10097dd8072095e0773e4ffcf432b848859ed24709e97c7b04c3e8a3d53540081ae20a8f586bc481009f8d493268c0b1209fad4ae0f40469149bc552',
+    '04bbf2b61aafb80d7a94cd0722cfff2476071dce50a3ffe36fcdc219b4b45d69f105a297e5ea79a970e1080e359bdc209b4f24f04555d3f6b54923218bfaba48ba',
+  ];
+  const ids = await Promise.all(keys.map((key) => peerIdOf(Uint8Array.from(Buffer.from(key, 'hex')))));
+  expect(ids[0]?.slice(0, 8)).toBe(ids[1]?.slice(0, 8));
+  expect(ids[0]).toHaveLength(26);
+  expect(ids[0]).not.toBe(ids[1]);
+  const n = noteBy('A', 1);
+  expect(decode({ v: 2, k: 'note', from: ids[0]?.slice(0, 8), note: n })).toBeNull();
+});

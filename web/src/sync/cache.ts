@@ -4,7 +4,7 @@ import { decode, verifyWire } from './wire';
 
 const KEY = 'asp:v2:';
 // decode() wants a sender id; a cached snapshot has no real sender.
-const LOCAL = 'AAAAAAAA';
+const LOCAL = 'AAAAAAAAAAAAAAAAAAAAAAAAAA';
 
 export async function loadCache(roomId: string, s: Pick<Storage, 'getItem'>, now: number): Promise<Note[]> {
   try {

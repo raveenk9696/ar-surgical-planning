@@ -10,9 +10,9 @@ const bytesOf = (s: string): Uint8Array<ArrayBuffer> => Uint8Array.from(atob(s.r
 export async function peerIdOf(raw: Uint8Array<ArrayBuffer>): Promise<string> {
   const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', raw));
   let id = '';
-  for (let bit = 0; bit < 40; bit += 5) {
+  for (let bit = 0; bit < 130; bit += 5) {
     const byte = bit >> 3;
-    const value = ((hash[byte] ?? 0) << 8) | (hash[byte + 1] ?? 0);
+    const value = ((hash[byte] ?? 0) << 8) | (byte + 1 < 16 ? hash[byte + 1] ?? 0 : 0);
     id += ALPHABET[(value >> (11 - (bit % 8))) & 31];
   }
   return id;
