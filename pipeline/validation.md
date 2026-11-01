@@ -32,8 +32,9 @@ Rerun the tests with `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytes
 
 ## Output hashes
 
-The commands below produce these SHA-256 values.
-The abdomen and legs outputs matched them when regenerated on Python 3.12.11.
+The abdomen and legs outputs matched these SHA-256 values when regenerated
+on macOS arm64 with Python 3.12.11.
+Other platforms can differ in the last bits of floating-point output.
 
 | Output | SHA-256 |
 | --- | --- |
