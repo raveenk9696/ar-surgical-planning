@@ -10,15 +10,10 @@ const FONT_PX = 28;
 const LINE_PX = 40;
 const PAD = 12;
 const HALO_PX = 7;
-const LEADER_PX = 28;
+const MIN_FONT_PX = 16;
 const WRAP_PX = 230;
 
 export interface FlatSize { w: number; h: number }
-
-export function fitNoteLabel(size: FlatSize): FlatSize {
-  const scale = Math.min(1, WRAP_PX / size.w);
-  return { w: size.w * scale, h: size.h * scale };
-}
 
 export const noteFontReady = (): Promise<unknown> => document.fonts.load(`${FONT_PX}px ${SCRIPT}`).catch(() => undefined);
 
@@ -44,9 +39,13 @@ function texture(c: HTMLCanvasElement, size: FlatSize): CanvasTexture {
 export const textureSize = (t: CanvasTexture): FlatSize => (t.userData as { size: FlatSize }).size;
 
 function wrap(ctx: CanvasRenderingContext2D, text: string): string[] {
-  if (ctx.measureText(text).width <= WRAP_PX) return [text];
+  if (ctx.measureText(text).width <= WRAP_PX - 2 * PAD) return [text];
   const words = text.split(' ');
-  if (words.length < 2) return [text];
+  if (words.length < 2) {
+    const characters = Array.from(text);
+    const middle = Math.ceil(characters.length / 2);
+    return [characters.slice(0, middle).join(''), characters.slice(middle).join('')];
+  }
   let best = 1;
   let gap = Infinity;
   for (let i = 1; i < words.length; i++) {
@@ -59,38 +58,34 @@ function wrap(ctx: CanvasRenderingContext2D, text: string): string[] {
   return [words.slice(0, best).join(' '), words.slice(best).join(' ')];
 }
 
-/** Red handwriting with a white halo and a short pen leader. The pin sits at the lower-left corner. */
 export function drawNoteLabel(text: string): CanvasTexture {
   const probe = canvas(1, 1).ctx;
   probe.font = `400 ${FONT_PX}px ${SCRIPT}`;
-  const lines = wrap(probe, text).slice(0, 2);
-  const widest = Math.max(...lines.map((l) => probe.measureText(l).width));
-  const size = { w: Math.ceil(LEADER_PX * 0.8 + PAD + widest + PAD), h: Math.ceil(PAD + lines.length * LINE_PX + 14) };
+  const font = !text.includes(' ') && probe.measureText(text).width > WRAP_PX - 2 * PAD ? UI : SCRIPT;
+  probe.font = `400 ${FONT_PX}px ${font}`;
+  const lines = wrap(probe, text);
+  let fontPx = FONT_PX;
+  let widest = Math.max(...lines.map((line) => probe.measureText(line).width));
+  while (widest + 2 * PAD > WRAP_PX && fontPx > MIN_FONT_PX) {
+    probe.font = `400 ${--fontPx}px ${font}`;
+    widest = Math.max(...lines.map((line) => probe.measureText(line).width));
+  }
+  const linePx = LINE_PX * fontPx / FONT_PX;
+  const size = { w: Math.ceil(2 * PAD + widest), h: Math.ceil(PAD + lines.length * linePx + 14) };
   const { c, ctx } = canvas(size.w, size.h);
-  ctx.font = `400 ${FONT_PX}px ${SCRIPT}`;
+  ctx.font = `400 ${fontPx}px ${font}`;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  const x = LEADER_PX * 0.8 + PAD / 2;
+  const x = PAD;
   lines.forEach((line, i) => {
-    const y = PAD + (i + 1) * LINE_PX - 8;
+    const y = PAD + (i + 1) * linePx - 8;
     ctx.lineWidth = HALO_PX;
     ctx.strokeStyle = 'rgba(255,255,255,0.92)';
     ctx.strokeText(`\u2068${line}\u2069`, x, y);
     ctx.fillStyle = NOTE_RED;
     ctx.fillText(`\u2068${line}\u2069`, x, y);
   });
-  const rad = (40 * Math.PI) / 180;
-  const from = { x: 2, y: size.h - 2 };
-  ctx.beginPath();
-  ctx.moveTo(from.x, from.y);
-  ctx.lineTo(from.x + Math.cos(rad) * LEADER_PX, from.y - Math.sin(rad) * LEADER_PX);
-  ctx.lineWidth = HALO_PX;
-  ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-  ctx.stroke();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = NOTE_RED;
-  ctx.stroke();
-  return texture(c, fitNoteLabel(size));
+  return texture(c, size);
 }
 
 /** A white disc with a red ring and a dot in the author's colour. The disc fills 80% of the square texture. */
@@ -210,4 +205,14 @@ export function keepLabelInView(label: Object3D, camera: Camera, width: number, 
   origin.y -= 2 * dy / height;
   origin.unproject(camera);
   label.position.copy(label.parent ? label.parent.worldToLocal(origin) : origin);
+}
+
+export function nearestLabelEdge(label: Object3D, pinWorld: Vector3): Vector3 {
+  label.updateWorldMatrix(true, false);
+  const point = label.worldToLocal(pinWorld.clone());
+  const x = Math.max(0, Math.min(1, point.x));
+  const y = Math.max(0, Math.min(1, point.y));
+  const edges = [new Vector3(0, y, 0), new Vector3(1, y, 0), new Vector3(x, 0, 0), new Vector3(x, 1, 0)];
+  const worldEdges = edges.map((edge) => label.localToWorld(edge));
+  return worldEdges.reduce((nearest, edge) => edge.distanceToSquared(pinWorld) < nearest.distanceToSquared(pinWorld) ? edge : nearest);
 }

@@ -1,9 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { drawNoteLabel, textureSize, fitNoteLabel } from './labels';
+import { drawNoteLabel, textureSize } from './labels';
 
 afterEach(() => vi.unstubAllGlobals());
 it('fits a 24-character wide label within 230 pixels on a 390-pixel phone', () => {
-  const ctx = new Proxy({ measureText: (text: string) => ({ width: text.length * 25 }) }, {
+  const ctx = new Proxy({ font: '', measureText(text: string) { return { width: text.length * 25 * (Number(/([\d.]+)px/.exec(this.font)?.[1] ?? 28) / 28) }; } }, {
     get: (target, key) => Reflect.get(target, key) ?? (() => undefined),
   });
   vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) });
@@ -12,11 +12,6 @@ it('fits a 24-character wide label within 230 pixels on a 390-pixel phone', () =
   expect(size.w).toBeLessThanOrEqual(230);
   expect(size.w / size.h).toBeCloseTo(texture.image.width / texture.image.height);
   texture.dispose();
-});
-
-it('keeps short label sizes and scales wide labels proportionally', () => {
-  expect(fitNoteLabel({ w: 100, h: 66 })).toEqual({ w: 100, h: 66 });
-  expect(fitNoteLabel({ w: 460, h: 100 })).toEqual({ w: 230, h: 50 });
 });
 
 it('isolates bidirectional canvas label text', () => {
@@ -51,4 +46,49 @@ it('keeps all four corners of a right-flank label inside the viewport margin', a
     expect((1 - point.y) * 422).toBeGreaterThanOrEqual(11.99);
     expect((1 - point.y) * 422).toBeLessThanOrEqual(832.01);
   }
+});
+
+it('breaks a 24-character word into two readable lines', () => {
+  const fillText = vi.fn();
+  const ctx = new Proxy({ fillText, font: '', measureText(text: string) { return { width: text.length * 25 * (Number(/([\d.]+)px/.exec(this.font)?.[1] ?? 28) / 28) }; } }, {
+    get: (target, key) => Reflect.get(target, key) ?? (() => undefined),
+  });
+  vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) });
+  const label = drawNoteLabel('W'.repeat(24));
+  expect(fillText).toHaveBeenCalledTimes(2);
+  const effectiveFont = Number(/([\d.]+)px/.exec(ctx.font)?.[1]) * textureSize(label).w / (label.image.width / 2);
+  expect(effectiveFont).toBeGreaterThanOrEqual(16);
+  expect(textureSize(label).w).toBeLessThanOrEqual(230);
+  label.dispose();
+});
+
+it('connects a shifted label to its pin with a separate leader ending at the nearest edge', async () => {
+  const { Group, PerspectiveCamera, Vector3, Line } = await import('three');
+  const { createPins } = await import('./pins');
+  const { createView } = await import('./labels');
+  const { noteBy } = await import('../test/signed');
+  const ctx = new Proxy({ measureText: (text: string) => ({ width: text.length * 8 }) }, { get: (target, key) => Reflect.get(target, key) ?? (() => undefined) });
+  vi.stubGlobal('document', { body: { classList: { contains: () => false } }, createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) });
+  vi.stubGlobal('matchMedia', () => ({ matches: true }));
+  const marks = new Group();
+  const pins = createPins(marks, { colorOf: () => '#00f', selfId: 'A' });
+  const note = noteBy('A', 1, { pos: [170, 0, 0], text: 'Look here right' });
+  pins.sync(new Map([[note.id, note]]), [note.id]);
+  const camera = new PerspectiveCamera(50, 390 / 844, 0.01, 100);
+  camera.position.z = 1;
+  camera.updateMatrixWorld();
+  const view = createView();
+  Object.assign(view, { camera, viewW: 390, viewH: 844, tanFov2: 2 * Math.tan(25 * Math.PI / 180) });
+  view.camPos.copy(camera.position);
+  pins.update(0.016, view, 0);
+  const leader = marks.children.find((o) => o instanceof Line) as InstanceType<typeof Line> | undefined;
+  expect(leader).toBeDefined();
+  const points = leader!.geometry.getAttribute('position');
+  expect(new Vector3().fromBufferAttribute(points, 0).distanceTo(new Vector3(0.17, 0, 0))).toBeLessThan(0.00001);
+  const label = marks.children.find((o) => o.renderOrder === 10)!;
+  const end = label.worldToLocal(new Vector3().fromBufferAttribute(points, 1));
+  expect(end.x).toBeGreaterThan(0);
+  expect(end.x).toBeLessThan(1);
+  expect(end.y).toBeCloseTo(0);
+  pins.dispose();
 });

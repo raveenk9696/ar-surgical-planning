@@ -1,7 +1,7 @@
-import { Camera, CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, Vector3, type Object3D } from 'three';
+import { BufferGeometry, Camera, CanvasTexture, Line, LineBasicMaterial, Mesh, MeshBasicMaterial, PlaneGeometry, Vector3, type Object3D } from 'three';
 import type { Note, NoteId, PeerId, Vec3 } from '../types';
 import { lpsDirToRig, lpsToRig } from './coords';
-import { drawNoteLabel, drawPin, keepLabelInView, noteFontReady, placeFlat, textureSize, type View } from './labels';
+import { NOTE_RED, nearestLabelEdge, drawNoteLabel, drawPin, keepLabelInView, noteFontReady, placeFlat, textureSize, type View } from './labels';
 
 const PIN_PX = 16;
 const PIN_PX_COARSE = 20;
@@ -21,6 +21,7 @@ interface Pin {
   nrm: Vector3;
   disc: Mesh<PlaneGeometry, MeshBasicMaterial>;
   label: Mesh<PlaneGeometry, MeshBasicMaterial> | null;
+  leader: Line<BufferGeometry, LineBasicMaterial> | null;
   opacity: number;
   pulse: number;
 }
@@ -67,7 +68,7 @@ export function createPins(marks: Object3D, view: { colorOf(id: PeerId): string;
     const disc = new Mesh(discGeo, material(discTexture(view.colorOf(authorId))));
     disc.renderOrder = 11;
     marks.add(disc);
-    pinsById.set(id, { id, authorId, text, pos: lpsToRig(pos, new Vector3()), nrm: lpsDirToRig(nrm), disc, label: null, opacity: 1, pulse: 0 });
+    pinsById.set(id, { id, authorId, text, pos: lpsToRig(pos, new Vector3()), nrm: lpsDirToRig(nrm), disc, label: null, leader: null, opacity: 1, pulse: 0 });
   }
 
   function dropLabel(p: Pin): void {
@@ -76,6 +77,10 @@ export function createPins(marks: Object3D, view: { colorOf(id: PeerId): string;
     p.label.material.map?.dispose();
     p.label.material.dispose();
     p.label = null;
+    p.leader?.removeFromParent();
+    p.leader?.geometry.dispose();
+    p.leader?.material.dispose();
+    p.leader = null;
   }
 
   function dropPin(p: Pin): void {
@@ -92,6 +97,10 @@ export function createPins(marks: Object3D, view: { colorOf(id: PeerId): string;
     label.material.opacity = p.opacity;
     marks.add(label);
     p.label = label;
+    const geometry = new BufferGeometry().setFromPoints([new Vector3(), new Vector3()]);
+    p.leader = new Line(geometry, new LineBasicMaterial({ color: NOTE_RED, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }));
+    p.leader.renderOrder = 9;
+    marks.add(p.leader);
   }
 
   const worldOf = (p: Pin, out: Vector3): Vector3 => out.copy(p.pos).applyMatrix4(marks.matrixWorld);
@@ -150,7 +159,17 @@ export function createPins(marks: Object3D, view: { colorOf(id: PeerId): string;
           p.label.material.opacity = p.opacity;
           p.label.position.copy(p.pos);
           placeFlat(p.label, world, size.h * (document.body.classList.contains('hero-model') ? 2.3 : 1) * (hovered === p.id ? 1.06 : 1), size.w / size.h, 0.04, v, v.xr ? 'y' : 'full');
+          p.label.position.add(new Vector3(p.label.scale.x * 12 / size.w, p.label.scale.y * 28 / size.h, 0).applyQuaternion(p.label.quaternion));
           if (!v.xr && v.camera) keepLabelInView(p.label, v.camera, v.viewW, v.viewH);
+          if (p.leader) {
+            const edge = marks.worldToLocal(nearestLabelEdge(p.label, world));
+            const points = p.leader.geometry.getAttribute('position');
+            points.setXYZ(0, p.pos.x, p.pos.y, p.pos.z);
+            points.setXYZ(1, edge.x, edge.y, edge.z);
+            points.needsUpdate = true;
+            p.leader.geometry.computeBoundingSphere();
+            p.leader.material.opacity = p.opacity;
+          }
         }
       }
     },
