@@ -37,11 +37,3 @@ GLBs contain named `bone` and `skin` meshes in LPS mm and provenance in scene ex
 
 Keep scans, models, renders, and patient headers outside Git.
 See `pipeline/validation.md` for the public-scan results.
-
-## Publish checklist
-
-- Confirm that each contributor's permission covers the MIT license.
-- Create the repository and publish the reviewed history on `main`. Make `main` the default branch. Keep the history intact so the README's commit references still resolve.
-- In Settings > Pages, set Source to GitHub Actions.
-- Before announcing the site, check that the repository and demo links in the root README return HTTP 200.
-- Check that the weekly workflow stays enabled. [GitHub disables scheduled workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule) in public repositories after 60 days without repository activity.
