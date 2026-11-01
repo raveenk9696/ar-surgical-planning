@@ -19,6 +19,19 @@ function packageNotice(directory: string): string {
   return `== ${metadata.name}@${metadata.version} ==\n\n${notices.join('\n\n')}`;
 }
 
+// three ships third-party code under examples/jsm/libs with its own copyright header,
+// which three's LICENSE does not cover.
+function vendoredNotice(id: string): string | null {
+  if (!id.includes('/examples/jsm/libs/')) return null;
+  const header: string[] = [];
+  for (const line of readFileSync(id, 'utf8').split('\n')) {
+    if (!line.startsWith('//')) break;
+    header.push(line.replace(/^\/\/\s?/, ''));
+  }
+  if (!header.some((line) => /copyright/i.test(line))) return null;
+  return `== ${id.slice(id.lastIndexOf('/') + 1)} (bundled with three) ==\n\n${header.join('\n')}`;
+}
+
 export function licenses(): Plugin {
   let publicDir = '';
   return {
@@ -29,11 +42,15 @@ export function licenses(): Plugin {
     },
     generateBundle() {
       const directories = new Set<string>();
+      const vendored = new Set<string>();
       for (const id of this.getModuleIds()) {
         const directory = packageDirectory(id);
         if (directory) directories.add(directory);
+        const notice = vendoredNotice(id);
+        if (notice) vendored.add(notice);
       }
-      const source = `Third-party licenses\n\n${[...directories].sort().map(packageNotice).join('\n\n')}\n`;
+      const notices = [...[...directories].sort().map(packageNotice), ...[...vendored].sort()];
+      const source = `Third-party licenses\n\n${notices.join('\n\n')}\n`;
       writeFileSync(join(publicDir, 'LICENSES.txt'), source);
       this.emitFile({ type: 'asset', fileName: 'LICENSES.txt', source });
     },
