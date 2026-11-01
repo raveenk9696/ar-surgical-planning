@@ -95,7 +95,16 @@ export function decode(raw: unknown, now = Date.now()): Wire | null {
       return from && d ? { v: 2, k: 'hello', from, digest: d } : null;
     }
     case 'presence': {
-      if (!exact(raw, ['v', 'k', 'from', 'seq', 'ptr', 'away', 'digest'])) return null;
+      const keys = ['v', 'k', 'from', 'seq', 'ptr', 'away', 'digest'];
+      if (!exact(raw, 'proof' in raw ? [...keys, 'proof'] : keys)) return null;
+      let proof;
+      if ('proof' in raw) {
+        if (!exact(raw.proof, ['publicKey', 'signature'])) return null;
+        const { publicKey, signature } = raw.proof;
+        if (typeof publicKey !== 'string' || !/^[A-Za-z0-9_-]{87}$/.test(publicKey)) return null;
+        if (typeof signature !== 'string' || !/^[A-Za-z0-9_-]{86}$/.test(signature)) return null;
+        proof = { publicKey, signature };
+      }
       const from = peer(raw.from);
       const d = digest(raw.digest);
       const ptr = raw.ptr === null ? null : vec3(raw.ptr, LIMITS.coordMm);
@@ -103,7 +112,7 @@ export function decode(raw: unknown, now = Date.now()): Wire | null {
       if (!from || !d || (raw.ptr !== null && !ptr)) return null;
       if (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0) return null;
       if (typeof raw.away !== 'boolean') return null;
-      return { v: 2, k: 'presence', from, seq, ptr, away: raw.away, digest: d };
+      return { v: 2, k: 'presence', from, seq, ptr, away: raw.away, digest: d, ...(proof ? { proof } : {}) };
     }
     case 'note': {
       if (!exact(raw, ['v', 'k', 'from', 'note'])) return null;

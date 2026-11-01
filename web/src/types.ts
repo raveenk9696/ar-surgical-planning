@@ -4,6 +4,7 @@ export type NoteId = string;
 export type Vec3 = readonly [x: number, y: number, z: number];
 export type Mesh = 'bone' | 'skin';
 export interface Peer { id: PeerId; name: string }
+export interface PresenceProof { publicKey: string; signature: string }
 export interface Deletion { id: NoteId; signature: string }
 interface NoteRecord {
   publicKey: string;
@@ -36,7 +37,7 @@ export type Wire =
   | { v: 2; k: 'hello'; from: Peer; digest: Digest }
   | { v: 2; k: 'snapshot'; from: PeerId; notes: Note[] }
   | { v: 2; k: 'note'; from: PeerId; note: Note }
-  | { v: 2; k: 'presence'; from: Peer; seq: number; ptr: Vec3 | null; away: boolean; digest: Digest }
+  | { v: 2; k: 'presence'; from: Peer; seq: number; ptr: Vec3 | null; away: boolean; digest: Digest; proof?: PresenceProof }
   | { v: 2; k: 'bye'; from: PeerId };
 export interface LinkStatus { tabs: 'ok' | 'off' | 'unavailable'; net: 'off' | 'connecting' | 'ok' | 'blocked' | 'down' }
 export interface RoomState {

@@ -1,4 +1,4 @@
-import type { Peer, Note, LiveNote, Tombstone, Deletion } from '../types';
+import type { Peer, Note, LiveNote, Tombstone, Deletion, Wire } from '../types';
 
 export interface Identity { peer: Peer; publicKey: string; privateKey: CryptoKey }
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -53,5 +53,23 @@ export async function verifyNote(n: Note, roomId: string): Promise<boolean> {
     const verify = (value: string, sig: string): Promise<boolean> => crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, bytesOf(sig), encoder.encode(value));
     if (!await verify(JSON.stringify(['asp-note-v2', roomId, canonicalNote(n)]), n.signature)) return false;
     return !n.deleted || !!n.deletion && n.deletion.id === n.id && await verify(JSON.stringify(['asp-del-v2', roomId, n.id]), n.deletion.signature);
+  } catch { return false; }
+}
+
+type PresenceMessage = Extract<Wire, { k: 'presence' }>;
+const canonicalPresence = (m: PresenceMessage, roomId: string): string =>
+  JSON.stringify(['asp-presence-v2', roomId, m.from.id, m.from.name, m.seq, m.ptr, m.away, m.digest.n, m.digest.h]);
+
+export async function signPresence(message: PresenceMessage, identity: Identity, roomId: string): Promise<PresenceMessage> {
+  return { ...message, proof: { publicKey: identity.publicKey, signature: await sign(canonicalPresence(message, roomId), identity) } };
+}
+
+export async function verifyPresence(message: PresenceMessage, roomId: string): Promise<boolean> {
+  try {
+    if (!message.proof) return false;
+    const raw = bytesOf(message.proof.publicKey);
+    if (await peerIdOf(raw) !== message.from.id) return false;
+    const key = await crypto.subtle.importKey('raw', raw, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    return await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, bytesOf(message.proof.signature), encoder.encode(canonicalPresence(message, roomId)));
   } catch { return false; }
 }

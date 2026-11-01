@@ -1,7 +1,7 @@
 import { LIMITS } from '../config';
 import type { Link, Transport } from '../net/transport';
 import type { AddResult, Digest, Mesh, Note, NoteId, Peer, PeerId, Presence, RoomState, Vec3, Wire } from '../types';
-import { canonicalNote, canonicalContent, eraseContent, signNote, signDeletion, type Identity } from './identity';
+import { canonicalNote, canonicalContent, eraseContent, signPresence, verifyPresence, signNote, signDeletion, type Identity } from './identity';
 import { loadCache, saveCache } from './cache';
 import { createLimiter } from './limiter';
 import { digestOf, mergeNote } from './notes';
@@ -73,11 +73,6 @@ export function liveCount(notes: ReadonlyMap<NoteId, Note>, authorId?: PeerId): 
   return n;
 }
 
-function touch(peers: ReadonlyMap<PeerId, Presence>, id: PeerId, now: number): ReadonlyMap<PeerId, Presence> {
-  const p = peers.get(id);
-  if (!p) return peers;
-  return new Map(peers).set(id, { ...p, seenAt: now });
-}
 
 function hello(s: RoomState): Wire {
   return { v: 2, k: 'hello', from: s.self, digest: digestOfMap(s.notes) };
@@ -93,7 +88,11 @@ export function reduce(s: RoomState, msg: Wire, now: number): { state: RoomState
     case 'hello':
     case 'presence': {
       const known = s.peers.get(msg.from.id);
-      if (!known && s.peers.size >= LIMITS.maxPeers) return { state: s, out: [] };
+      const peers = new Map(s.peers);
+      if (!known && peers.size >= LIMITS.maxPeers) {
+        const oldest = [...peers].sort((a, b) => a[1].seenAt - b[1].seenAt)[0];
+        if (oldest) peers.delete(oldest[0]);
+      }
       const out: Wire[] = [];
       if (!known) out.push(hello(s));
       if (!sameDigest(msg.digest, digestOfMap(s.notes))) out.push(snapshot(s));
@@ -105,13 +104,12 @@ export function reduce(s: RoomState, msg: Wire, now: number): { state: RoomState
         away: fresh ? msg.away : (known?.away ?? false),
         seenAt: now,
       };
-      return { state: { ...s, peers: new Map(s.peers).set(msg.from.id, next) }, out };
+      return { state: { ...s, peers: peers.set(msg.from.id, next) }, out };
     }
     case 'note':
     case 'snapshot': {
       const notes = mergeNotes(s.notes, msg.k === 'note' ? [msg.note] : msg.notes, s.self.id);
-      const peers = touch(s.peers, msg.from, now);
-      return { state: notes === s.notes && peers === s.peers ? s : { ...s, notes, peers }, out: [] };
+      return { state: notes === s.notes ? s : { ...s, notes }, out: [] };
     }
     case 'bye': {
       if (!s.peers.has(msg.from)) return { state: s, out: [] };
@@ -157,7 +155,8 @@ export function createEngine(o: {
   const timers = o.timers ?? globalThis;
   const tickMs = Math.round(1000 / LIMITS.presenceHz);
 
-  const all = createLimiter({ burst: LIMITS.inboundPerSec, refillMs: 1000 / LIMITS.inboundPerSec }, now);
+  const linkShare = Math.floor(LIMITS.inboundPerSec / LIMITS.maxPeers);
+  const inboundBudget = createLimiter({ burst: linkShare, refillMs: 1000 / linkShare }, now);
   const perLink = {
     note: createLimiter(LIMITS.noteBucket, now),
     snapshot: createLimiter({ burst: 1, refillMs: LIMITS.snapshotMinGapMs }, now),
@@ -192,7 +191,8 @@ export function createEngine(o: {
   let newerReported = false;
   const pendingLinks = new Map<Link, number>();
   const noteLinks = new Map<NoteId, string>();
-  const identities = new Map<PeerId, { link: Link; seenAt: number }>();
+  const identities = new Map<PeerId, { link: Link; seenAt: number; authenticated: boolean }>();
+  const pendingPresence = new Set<Link>();
   const linkPeers = new Map<Link, PeerId>();
 
   function unbind(id: PeerId): void {
@@ -216,10 +216,24 @@ export function createEngine(o: {
     }
     const peers = !samePeers(prev.peers, next.peers);
     const link = prev.link !== next.link || prev.netPeers !== next.netPeers;
-    if (notes.length || peers || link) for (const fn of [...subs]) fn(next, { notes, peers, link });
+    if (notes.length || peers || link) {
+      for (const fn of [...subs]) {
+        try { fn(next, { notes, peers, link }); }
+        catch (error) { console.error('Room subscriber failed', error); }
+      }
+    }
   }
 
-  const send = (w: Wire): void => transport.send(w);
+  const send = (w: Wire): void => {
+    if (w.k !== 'presence') {
+      transport.send(w);
+      return;
+    }
+    const epoch = generation;
+    void signPresence(w, identity, roomId).then((signed) => {
+      if (running && epoch === generation) transport.send(signed);
+    }).catch((error) => console.error('Presence signing failed', error));
+  };
   const sendHello = (): void => send(hello(state));
 
   function sendPresence(): void {
@@ -247,6 +261,29 @@ export function createEngine(o: {
     return out;
   }
 
+  function bindPresence(msg: Wire, link: Link, authenticated: boolean): boolean {
+    const from = senderOf(msg);
+    const bound = identities.get(from);
+    if (link !== 'tab' && linkPeers.has(link) && linkPeers.get(link) !== from) return false;
+    const seq = msg.k === 'presence' ? msg.seq : 0;
+    const previousSeq = state.peers.get(from)?.seq ?? -1;
+    if (bound?.authenticated && !authenticated && msg.k !== 'bye') return false;
+    if (bound && (bound.link !== link || authenticated && !bound.authenticated)) {
+      if (bound.authenticated && !authenticated) return false;
+      const provedNewer = authenticated && (!bound.authenticated || seq > previousSeq);
+      if (!provedNewer && now() - bound.seenAt < 2 * LIMITS.heartbeatMs) return false;
+      unbind(from);
+      if (state.peers.has(from)) {
+        const peers = new Map(state.peers);
+        peers.delete(from);
+        commit({ ...state, peers });
+      }
+    } else if (authenticated && bound?.authenticated && seq <= previousSeq) return false;
+    identities.set(from, { link, seenAt: now(), authenticated: authenticated || !!bound?.authenticated });
+    if (link !== 'tab') linkPeers.set(link, from);
+    return true;
+  }
+
   function inbound(raw: unknown, link: Link): void {
     const msg = decode(raw, now());
     if (!msg) {
@@ -259,24 +296,18 @@ export function createEngine(o: {
     const from = senderOf(msg);
     if (from === self.id) return;
     if (!perLink[msg.k === 'bye' ? 'hello' : msg.k].take(link)) return;
-    if (!all.take('all')) return;
+    if (!inboundBudget.take(link)) return;
     const signed = msg.k === 'note' || msg.k === 'snapshot';
-    const bound = identities.get(from);
-    // Presence is unsigned. Link binding limits spoofing of pointers, which cannot change notes.
-    if (!signed && bound && bound.link !== link) {
-      if (now() - bound.seenAt < 5000) return;
-      unbind(from);
-      if (state.peers.has(from)) {
-        const peers = new Map(state.peers);
-        peers.delete(from);
-        commit({ ...state, peers });
-      }
+    if (msg.k === 'presence' && msg.proof) {
+      if (pendingPresence.has(link)) return;
+      pendingPresence.add(link);
+      const epoch = generation;
+      void verifyPresence(msg, roomId).then((valid) => {
+        if (valid && running && epoch === generation && bindPresence(msg, link, true)) accept(msg, link);
+      }).finally(() => pendingPresence.delete(link));
+      return;
     }
-    if (!signed && link !== 'tab' && linkPeers.has(link) && linkPeers.get(link) !== from) return;
-    if (!signed) {
-      identities.set(from, { link, seenAt: now() });
-      if (link !== 'tab') linkPeers.set(link, from);
-    }
+    if (!signed && !bindPresence(msg, link, false)) return;
     if (signed) {
       const counts = new Map<string, number>();
       for (const owner of noteLinks.values()) counts.set(owner, (counts.get(owner) ?? 0) + 1);

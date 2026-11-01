@@ -73,3 +73,91 @@ it('C5 keeps local notes and permits another add after five Sybil links fill the
   expect(engine.state.notes.size).toBeLessThanOrEqual(100);
   engine.stop();
 });
+
+const presence = (c: string, seq = 1) => ({ v: 2, k: 'presence', from: peer(c), seq, ptr: null, away: false, digest: { n: 0, h: 0 } });
+
+it('C9 serves an honest note after 70 links spend their presence bursts', async () => {
+  const { engine, end } = setup();
+  await engine.start();
+  for (let link = 0; link < 70; link++) for (let seq = 1; seq <= 30; seq++) end.inject(presence('M', seq), `nostr:sybil${link}`);
+  const note = noteBy('V', 1);
+  end.inject({ v: 2, k: 'note', from: note.author.id, note }, 'nostr:honest');
+  await settle();
+  expect(engine.state.notes.has(note.id)).toBe(true);
+  engine.stop();
+});
+
+it('C11 lets a new peer enter a roster occupied by eight ghosts', async () => {
+  const { engine, end } = setup();
+  await engine.start();
+  for (const c of 'BCDEFGHI') end.inject(presence(c), `nostr:${c}`);
+  end.inject(presence('V'), 'nostr:v');
+  expect(engine.state.peers.has(peer('V').id)).toBe(true);
+  expect(engine.state.peers.size).toBe(8);
+  engine.stop();
+});
+
+it('C12 allows a newer link after two quiet heartbeats and ignores signed replay keepalives', async () => {
+  const { engine, end } = setup();
+  await engine.start();
+  end.inject(presence('V', 99), 'nostr:old');
+  vi.advanceTimersByTime(4000);
+  const note = noteBy('V', 1);
+  end.inject({ v: 2, k: 'note', from: note.author.id, note }, 'nostr:relay');
+  await settle();
+  expect(engine.state.peers.get(peer('V').id)?.seenAt).toBeLessThan(Date.now());
+  end.inject({ ...presence('V'), from: { ...peer('V'), name: 'New link' } }, 'nostr:new');
+  expect(engine.state.peers.get(peer('V').id)?.peer.name).toBe('New link');
+  expect(engine.state.peers.get(peer('V').id)?.seq).toBe(1);
+  engine.stop();
+});
+
+it('F3a isolates subscriber failures from later subscribers and cache writes', async () => {
+  const write = vi.fn();
+  const { engine } = setup({ getItem: () => null, setItem: write } as unknown as Storage);
+  await engine.start();
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  engine.subscribe(() => { throw new Error('subscriber failed'); });
+  const next = vi.fn();
+  engine.subscribe(next);
+  await expect(engine.addNote({ pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'survives' })).resolves.toMatchObject({ ok: true });
+  vi.advanceTimersByTime(600);
+  expect(next).toHaveBeenCalled();
+  expect(write).toHaveBeenCalled();
+  engine.stop();
+});
+
+it('C12 authenticated presence displaces a continuously refreshed spoof and rejects later spoofing', async () => {
+  const { signPresence } = await import('./identity');
+  const { engine, end } = setup();
+  await engine.start();
+  end.inject({ ...presence('V'), from: { ...peer('V'), name: 'Fake V' } }, 'nostr:m');
+  for (let i = 0; i < 20; i++) {
+    vi.advanceTimersByTime(1000);
+    end.inject({ ...presence('V', 2 + i), from: { ...peer('V'), name: 'Fake V' } }, 'nostr:m');
+    const real = await signPresence({ v: 2, k: 'presence', from: { ...peer('V'), name: 'Real V' }, seq: 100 + i, ptr: null, away: false, digest: { n: 0, h: 0 } }, identity('V'), 'ABCDEFGHIJ');
+    end.inject(real, 'nostr:v');
+    await settle();
+  }
+  expect(engine.state.peers.get(peer('V').id)?.peer.name).toBe('Real V');
+  end.inject({ ...presence('V', 9999), from: { ...peer('V'), name: 'Fake V' } }, 'nostr:m');
+  expect(engine.state.peers.get(peer('V').id)?.peer.name).toBe('Real V');
+  engine.stop();
+});
+
+it('authenticates the first presence on a shared tab link despite an unsigned high sequence', async () => {
+  const { signPresence } = await import('./identity');
+  const { engine, end } = setup();
+  await engine.start();
+  end.inject(presence('V', 9999), 'tab');
+  const signed = await signPresence({ v: 2, k: 'presence', from: peer('V'), seq: 1, ptr: [1, 2, 3], away: false, digest: { n: 0, h: 0 } }, identity('V'), 'ABCDEFGHIJ');
+  end.inject(signed, 'tab');
+  await settle();
+  expect(engine.state.peers.get(peer('V').id)?.seq).toBe(1);
+  const seen = engine.state.peers.get(peer('V').id)?.seenAt;
+  vi.advanceTimersByTime(1000);
+  end.inject(signed, 'tab');
+  await settle();
+  expect(engine.state.peers.get(peer('V').id)?.seenAt).toBe(seen);
+  engine.stop();
+});

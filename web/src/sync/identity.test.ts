@@ -65,3 +65,12 @@ it('rejects note and deletion signatures outside their signing room', async () =
   expect(await verifyNote(eraseContent(local, deletion), 'room-b')).toBe(false);
   expect(await loadCache('room-b', { getItem: () => JSON.stringify({ savedAt: Date.now(), notes: [n, dead] }) }, Date.now())).toEqual([]);
 });
+
+it('authenticates presence fields and rejects cross-room or edited proofs', async () => {
+  const { signPresence, verifyPresence } = await import('./identity');
+  const message = await signPresence({ v: 2, k: 'presence', from: identity('A').peer, seq: 1, ptr: [1, 2, 3], away: false, digest: { n: 0, h: 0 } }, identity('A'), 'room-a');
+  expect(await verifyPresence(message, 'room-a')).toBe(true);
+  expect(await verifyPresence(message, 'room-b')).toBe(false);
+  expect(await verifyPresence({ ...message, from: { ...message.from, name: 'Spoof' } }, 'room-a')).toBe(false);
+  expect(await verifyPresence({ ...message, seq: 999 }, 'room-a')).toBe(false);
+});
