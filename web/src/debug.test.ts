@@ -22,7 +22,7 @@ describe('parseFlags', () => {
 
 
 afterEach(() => vi.unstubAllEnvs());
-it('ignores debug and relay overrides in production', () => {
+it('ignores debug, relay, transport and hero overrides in production', () => {
   vi.stubEnv('DEV', false);
-  expect(parseFlags('?debug=1&relays=wss://attacker.example&transport=tabs')).toMatchObject({ debug: false, relays: null, transport: 'tabs' });
+  expect(parseFlags('?debug=1&relays=wss://attacker.example&transport=tabs&hero=together')).toMatchObject({ debug: false, relays: null, transport: null, hero: null });
 });

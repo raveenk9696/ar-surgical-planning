@@ -15,9 +15,9 @@ export function parseFlags(search: string): Flags {
   const q = new URLSearchParams(search);
   const debug = import.meta.env.DEV && q.get('debug') === '1';
   const relays = (q.get('relays') ?? '').split(',').map((r) => r.trim()).filter((r) => /^wss:\/\/[^\s]+$/.test(r));
-  const transport = q.get('transport');
+  const transport = import.meta.env.DEV ? q.get('transport') : null;
   const quality = q.get('quality');
-  const hero = q.get('hero');
+  const hero = import.meta.env.DEV ? q.get('hero') : null;
   return {
     debug,
     relays: debug && relays.length ? relays : null,
