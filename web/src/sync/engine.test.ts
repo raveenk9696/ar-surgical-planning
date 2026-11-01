@@ -32,7 +32,7 @@ describe('engine on a fake network', () => {
     await b.engine.start();
     await run(10);
     await settle();
-    expect((await add(a.engine))).toEqual({ ok: true, id: `${peer('A').id}.1` });
+    expect((await add(a.engine))).toEqual({ ok: true, id: expect.stringMatching(new RegExp(`^${peer('A').id}\\.`)) });
     await run(10);
     await settle();
     expect(texts(b.engine)).toEqual(['hip']);
@@ -87,7 +87,7 @@ describe('engine on a fake network', () => {
     (await add(a.engine));
     await run(20);
     await settle();
-    expect(seen).toEqual([[`${peer('A').id}.1`]]);
+    expect(seen).toEqual([[...a.engine.state.notes.keys()]]);
   });
 
   it('repairs a partition by digest once it heals', async () => {

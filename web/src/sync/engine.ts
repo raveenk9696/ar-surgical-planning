@@ -57,8 +57,7 @@ export function mergeNotes(notes: ReadonlyMap<NoteId, Note>, incoming: readonly 
       const own = Number(b.author.id === protectedAuthor) - Number(a.author.id === protectedAuthor);
       const kind = Number(a.deleted) - Number(b.deleted);
       const age = a.deleted ? a.created - b.created : b.created - a.created;
-      const sequence = a.deleted ? 0 : Number(a.id.split('.')[1]) - Number(b.id.split('.')[1]);
-      return own || kind || age || sequence || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      return own || kind || age || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     });
     let live = 0;
     next = new Map(ordered.filter((n) => n.deleted || ++live <= LIMITS.maxLive).slice(0, LIMITS.maxRecords).map((n) => [n.id, n]));
@@ -180,7 +179,6 @@ export function createEngine(o: {
   }
   let startedAt = 0;
   let helloIndex = 0;
-  let counter = 0;
   let seq = 0;
   let ptr: Vec3 | null = null;
   let ptrDirty = false;
@@ -406,7 +404,7 @@ export function createEngine(o: {
         return { ok: false, why: 'full' };
       }
       if (!ownNotes.take('self')) return { ok: false, why: 'rate' };
-      const id = `${self.id}.${++counter}`;
+      const id = `${self.id}.${now().toString(36)}-${crypto.randomUUID().replaceAll('-', '')}`;
       localNote(await signNote({ publicKey: identity.publicKey, signature: '', deletion: null, id, pos: i.pos, nrm: i.nrm, mesh: i.mesh, text, author: self, created: now(), deleted: false }, identity, roomId));
       return { ok: true, id };
     }); },
@@ -435,7 +433,6 @@ export function createEngine(o: {
         const cached = await loadCache(roomId, o.storage, now());
         if (!running || epoch !== generation) return;
         commit({ ...state, notes: mergeNotes(state.notes, cached, self.id) });
-        for (const n of state.notes.values()) if (n.author.id === self.id) counter = Math.max(counter, Number(n.id.split('.')[1]));
       }
       startedAt = now();
       cleanups.push(transport.onMessage(inbound), transport.onStatus((st) => {

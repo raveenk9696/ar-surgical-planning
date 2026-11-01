@@ -196,3 +196,23 @@ it.each([21, 35])('E5/E6 late joiner converges on %i records through one relay p
   a.stop();
   b.stop();
 });
+
+it('does not reuse note ids after a reload without a cache, even at the same time', async () => {
+  const first = setup();
+  await first.engine.start();
+  const input = { pos: [1, 2, 3] as const, nrm: [0, 0, 1] as const, mesh: 'bone' as const, text: 'old' };
+  const old = await first.engine.addNote(input);
+  if (!old.ok) throw new Error('add failed');
+  await first.engine.deleteNote(old.id);
+  const held = [...first.engine.state.notes.values()];
+  first.engine.stop();
+  const reloaded = setup();
+  await reloaded.engine.start();
+  reloaded.end.inject(snapshot(held), 'nostr:peer');
+  await settle();
+  const added = await reloaded.engine.addNote({ ...input, text: 'new' });
+  if (!added.ok) throw new Error('add failed');
+  expect(added.id).not.toBe(old.id);
+  expect(reloaded.engine.state.notes.get(added.id)?.text).toBe('new');
+  reloaded.engine.stop();
+});

@@ -5,7 +5,7 @@ import type { Digest, Mesh, Note, Peer, Vec3, Wire } from '../types';
 type Obj = Record<string, unknown>;
 
 const PEER_ID = /^[A-Z2-7]{26}$/;
-const NOTE_ID = /^[A-Z2-7]{26}\.\d{1,9}$/;
+const NOTE_ID = /^[A-Z2-7]{26}\.(?:\d{1,9}|[a-z0-9]{1,11}-[a-f0-9]{32})$/;
 const FORBIDDEN_KEYS = ['__proto__', 'constructor', 'prototype'];
 const NAME_MAX = 16;
 export function isSafeText(value: string): boolean {
