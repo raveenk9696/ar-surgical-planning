@@ -42,3 +42,18 @@ it('explains unsupported AR when clicked and makes its disabled appearance expli
   byId('btn-ar').dispatchEvent(new Event('click'));
   expect(enter).toHaveBeenCalledOnce();
 });
+
+it('keeps AR off and reports a failed 3D view without claiming WebXR is unsupported', () => {
+  vi.useFakeTimers();
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  const unavailable = vi.fn();
+  const enter = vi.fn();
+  const hud = createHud({ onSkin() {}, onArm() {}, onReset() {}, onShare() {}, onSecond() {}, onAr: enter, onArUnavailable: unavailable });
+  hud.setAr('blocked');
+  byId('btn-ar').dispatchEvent(new Event('click'));
+  expect(byId('btn-ar').getAttribute('aria-disabled')).toBe('true');
+  expect(byId('ar-help').hidden).toBe(false);
+  expect(byId('ar-help').textContent).toBe('The 3D view could not start.');
+  expect(unavailable).toHaveBeenCalledWith('The 3D view could not start.');
+  expect(enter).not.toHaveBeenCalled();
+});

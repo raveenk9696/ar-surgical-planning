@@ -106,7 +106,7 @@ async function boot(): Promise<void> {
     },
     onSecond: openSecond,
     onAr: () => startAr(),
-    onArUnavailable: () => status.toast('This browser does not support WebXR AR.'),
+    onArUnavailable: (message) => status.toast(message),
   });
 
   const notesView = createNotesView(roster, {
@@ -179,7 +179,7 @@ async function boot(): Promise<void> {
   } catch {
     showTile(MESSAGES.noGl);
     hud.setThreeDEnabled(false);
-    hud.setAr('unsupported');
+    hud.setAr('blocked');
     byId('progress').hidden = true;
     lazyNet(multi);
     return;
@@ -220,7 +220,7 @@ async function boot(): Promise<void> {
     (e: unknown) => {
       bar.hidden = true;
       hud.setThreeDEnabled(false);
-      hud.setAr('unsupported');
+      hud.setAr('blocked');
       showTile(e instanceof Error ? e.message : 'The 3D model could not be loaded.');
       lazyNet(multi);
     },

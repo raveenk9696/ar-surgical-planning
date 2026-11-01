@@ -1,7 +1,7 @@
 import { byId, setIcon, setLabel } from './dom';
 import { icon } from './icons';
 
-export type ArState = 'checking' | 'ready' | 'unsupported';
+export type ArState = 'checking' | 'ready' | 'unsupported' | 'blocked';
 
 export interface Hud {
   setSkin(on: boolean): void;
@@ -20,7 +20,7 @@ export function createHud(o: {
   onShare(): void;
   onSecond(): void;
   onAr(): void;
-  onArUnavailable(): void;
+  onArUnavailable(message: string): void;
 }): Hud {
   const skin = byId('btn-skin');
   const add = byId('btn-add');
@@ -71,8 +71,9 @@ export function createHud(o: {
     setAr(s) {
       arState = s;
       ar.setAttribute('aria-disabled', String(s !== 'ready'));
-      arHelp.hidden = s !== 'unsupported';
-      if (s === 'unsupported') ar.setAttribute('aria-describedby', 'ar-help');
+      arHelp.textContent = s === 'blocked' ? 'The 3D view could not start.' : 'Needs a browser with WebXR AR, such as Android Chrome.';
+      arHelp.hidden = s !== 'unsupported' && s !== 'blocked';
+      if (s === 'unsupported' || s === 'blocked') ar.setAttribute('aria-describedby', 'ar-help');
       else ar.removeAttribute('aria-describedby');
     },
     setShareCopied() {
@@ -105,7 +106,8 @@ export function createHud(o: {
   guarded(reset, o.onReset);
   ar.addEventListener('click', () => {
     if (arState === 'ready') o.onAr();
-    else if (arState === 'unsupported') o.onArUnavailable();
+    else if (arState === 'unsupported') o.onArUnavailable('This browser does not support WebXR AR.');
+    else if (arState === 'blocked') o.onArUnavailable('The 3D view could not start.');
   });
   share.addEventListener('click', o.onShare);
   second.addEventListener('click', o.onSecond);
