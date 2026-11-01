@@ -407,6 +407,7 @@ export function createEngine(o: {
         const cached = await loadCache(roomId, o.storage, now());
         if (!running || epoch !== generation) return;
         commit({ ...state, notes: mergeNotes(state.notes, cached) });
+        for (const n of state.notes.values()) if (n.author.id === self.id) counter = Math.max(counter, Number(n.id.split('.')[1]));
       }
       startedAt = now();
       cleanups.push(transport.onMessage(inbound), transport.onStatus((st) => {

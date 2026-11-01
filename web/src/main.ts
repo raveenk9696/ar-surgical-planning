@@ -13,7 +13,7 @@ import { applyHero, createHeroTransport } from './scene/hero';
 import { setupAr } from './scene/xr';
 import { createViewer, type Viewer } from './scene/viewer';
 import { createEngine } from './sync/engine';
-import { newPeer } from './sync/identity';
+import { loadIdentity } from './sync/identityStore';
 import { newToken, readToken, shareUrl, split } from './sync/roomId';
 import { setupAbout } from './ui/about';
 import { byId } from './ui/dom';
@@ -56,7 +56,7 @@ async function copyLink(): Promise<boolean> {
 }
 
 async function boot(): Promise<void> {
-  const identity = await newPeer();
+  const identity = await loadIdentity();
   const self = identity.peer;
   const status = createStatus();
   let newer = false;
