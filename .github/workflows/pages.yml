@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
+  group: pages-${{ github.ref == 'refs/heads/main' && 'deploy' || github.ref }}
   cancel-in-progress: false
 
 env:
@@ -21,9 +21,6 @@ env:
 
 jobs:
   build:
-    permissions:
-      contents: read
-      pages: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -55,7 +52,6 @@ jobs:
         continue-on-error: ${{ github.event_name != 'schedule' }}
       - run: npm run build && SMOKE_REQUIRE_MODEL=1 npm run smoke
         working-directory: web
-      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
           path: web/dist
