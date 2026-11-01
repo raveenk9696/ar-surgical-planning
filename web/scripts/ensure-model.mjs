@@ -18,5 +18,6 @@ if (raw && existsSync(raw)) {
     writeFileSync(stamp, hash);
   }
 } else if (!packed || raw) {
-  console.log('No model. Run the pipeline (see .github/workflows/pages.yml) and set AR_MODEL_SRC=<raw.glb>.');
+  console.error('No model. Run the pipeline (see .github/workflows/pages.yml) and set AR_MODEL_SRC=<raw.glb>.');
+  process.exit(1);
 }

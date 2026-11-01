@@ -18,13 +18,13 @@ function fixture() {
   `);
   const source = join(root, 'source.bin');
   const output = join(root, 'public/models/abdomen.glb');
-  const run = (raw?: string) => {
+  const run = (raw?: string, expectedStatus = 0) => {
     const env = { ...process.env };
     delete env.AR_MODEL_SRC;
     if (raw) env.AR_MODEL_SRC = raw;
     const result = spawnSync(process.execPath, [join(root, 'scripts/ensure-model.mjs')], { env, encoding: 'utf8' });
-    expect(result.status, result.stderr).toBe(0);
-    return result.stdout;
+    expect(result.status, result.stderr).toBe(expectedStatus);
+    return result.stdout + result.stderr;
   };
   return { source, output, run, close: () => rmSync(root, { recursive: true, force: true }) };
 }
@@ -32,7 +32,7 @@ function fixture() {
 it('requires an explicit model source instead of reading a shared temporary default', () => {
   const f = fixture();
   try {
-    expect(f.run()).toContain('set AR_MODEL_SRC=<raw.glb>');
+    expect(f.run(undefined, 1)).toContain('set AR_MODEL_SRC=<raw.glb>');
     expect(existsSync(f.output)).toBe(false);
   } finally { f.close(); }
 });
@@ -51,5 +51,28 @@ it('repacks changed source content even when size and timestamp stay unchanged',
     utimesSync(f.source, before.atime, before.mtime);
     f.run(f.source);
     expect(readFileSync(f.output, 'utf8')).toBe('other');
+  } finally { f.close(); }
+});
+
+
+it.each([false, true])('rejects a missing explicit source even with a stale pack: %s', (packed) => {
+  const f = fixture();
+  try {
+    if (packed) {
+      writeFileSync(f.source, 'old model');
+      f.run(f.source);
+    }
+    expect(f.run(f.source + '.missing', 1)).toContain('set AR_MODEL_SRC=<raw.glb>');
+    if (packed) expect(readFileSync(f.output, 'utf8')).toBe('old model');
+  } finally { f.close(); }
+});
+
+it('accepts an existing packed model when no source is requested', () => {
+  const f = fixture();
+  try {
+    writeFileSync(f.source, 'packed model');
+    f.run(f.source);
+    f.run();
+    expect(readFileSync(f.output, 'utf8')).toBe('packed model');
   } finally { f.close(); }
 });
