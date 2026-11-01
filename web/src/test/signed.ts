@@ -19,13 +19,13 @@ for (const c of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
 }
 export const identity = (c: string): Identity => identities.get(c)!;
 export const peer = (c: string): Peer => identity(c).peer;
-export function noteBy(c: string, n: number, over: Partial<Note> = {}): Note {
+export function noteBy(c: string, n: number, over: Partial<Note> = {}, roomId = 'ABCDEFGHIJ'): Note {
   const who = identity(c);
   const note: Note = { id: `${who.peer.id}.${n}`, pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'x', author: who.peer, created: Date.now(), deleted: false, deletion: null, publicKey: who.publicKey, signature: '', ...over };
   const signed = (s: string): string => sign('sha256', Buffer.from(s), { key: keys.get(c)!, dsaEncoding: 'ieee-p1363' }).toString('base64url');
   if (note.deleted && !note.text) note.text = 'x';
-  note.signature = signed(canonicalNote(note));
-  if (note.deleted) note.deletion = { id: note.id, signature: signed(JSON.stringify(['del', note.id])) };
+  note.signature = signed(JSON.stringify(['asp-note-v2', roomId, canonicalNote(note)]));
+  if (note.deleted) note.deletion = { id: note.id, signature: signed(JSON.stringify(['asp-del-v2', roomId, note.id])) };
   return note;
 }
 export const settle = async (): Promise<void> => { await delay(30); };

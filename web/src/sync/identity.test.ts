@@ -11,8 +11,8 @@ describe('signed records at the boundary', () => {
     expect(a.peer.id).not.toBe(b.peer.id);
     expect(a.peer.id).toBe(await peerIdOf(Uint8Array.from(Buffer.from(a.publicKey, 'base64url'))));
     expect(a.privateKey.extractable).toBe(false);
-    const n = await signNote({ ...noteBy('A', 1), id: `${a.peer.id}.1`, author: a.peer }, a);
-    expect(await verifyNote(n)).toBe(true);
+    const n = await signNote({ ...noteBy('A', 1), id: `${a.peer.id}.1`, author: a.peer }, a, 'ABCDEFGHIJ');
+    expect(await verifyNote(n, 'ABCDEFGHIJ')).toBe(true);
   });
   it.each(['signature', 'prefix', 'key', 'text', 'name', 'deletion'] as const)('drops snapshot and cached notes with forged %s', async (attack) => {
     const n = noteBy('A', 1);
@@ -22,14 +22,14 @@ describe('signed records at the boundary', () => {
     if (attack === 'key') bad.publicKey = identity('B').publicKey;
     if (attack === 'text') bad.text = 'AMPUTATE LEFT LEG';
     if (attack === 'name') bad.author = { ...n.author, name: 'Dr Chen' };
-    if (attack === 'deletion') { bad.deleted = true; bad.deletion = await signDeletion(n.id, identity('B')); }
+    if (attack === 'deletion') { bad.deleted = true; bad.deletion = await signDeletion(n.id, identity('B'), 'ABCDEFGHIJ'); }
     const wire = decode({ v: 2, k: 'snapshot', from: identity('B').peer.id, notes: [bad] });
-    if (wire) expect(await verifyWire(wire)).toMatchObject({ notes: [] });
+    if (wire) expect(await verifyWire(wire, 'ABCDEFGHIJ')).toMatchObject({ notes: [] });
     expect(await loadCache('ROOM', { getItem: () => JSON.stringify({ savedAt: Date.now(), notes: [bad] }) }, Date.now())).toEqual([]);
   });
   it('accepts a relayed author deletion with its signed note and rejects an orphan deletion', async () => {
     const n = noteBy('A', 1, { deleted: true });
-    expect(await verifyNote(n)).toBe(true);
+    expect(await verifyNote(n, 'ABCDEFGHIJ')).toBe(true);
     expect(decode({ v: 2, k: 'snapshot', from: identity('B').peer.id, notes: [n.deletion] })).toMatchObject({ notes: [] });
   });
 });
@@ -51,4 +51,17 @@ it('separates the verifier 40-bit collision at the full 128-bit width', async ()
   expect(ids[0]).not.toBe(ids[1]);
   const n = noteBy('A', 1);
   expect(decode({ v: 2, k: 'note', from: ids[0]?.slice(0, 8), note: n })).toBeNull();
+});
+
+it('rejects note and deletion signatures outside their signing room', async () => {
+  const n = await signNote(noteBy('A', 1), identity('A'), 'room-a');
+  expect(await verifyNote(n, 'room-a')).toBe(true);
+  expect(await verifyNote(n, 'room-b')).toBe(false);
+  const deletion = await signDeletion(n.id, identity('A'), 'room-a');
+  const dead = { ...n, deleted: true, deletion };
+  expect(await verifyNote(dead, 'room-a')).toBe(true);
+  expect(await verifyNote(dead, 'room-b')).toBe(false);
+  const local = await signNote(noteBy('A', 1), identity('A'), 'room-b');
+  expect(await verifyNote({ ...local, deleted: true, deletion }, 'room-b')).toBe(false);
+  expect(await loadCache('room-b', { getItem: () => JSON.stringify({ savedAt: Date.now(), notes: [n, dead] }) }, Date.now())).toEqual([]);
 });

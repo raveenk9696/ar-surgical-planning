@@ -2,7 +2,7 @@ import { noteBy } from '../test/signed';
 import { describe, expect, it } from 'vitest';
 import { loadCache, saveCache } from './cache';
 
-const note = noteBy('A', 1, { created: 5 });
+const note = noteBy('A', 1, { created: 5 }, 'ROOM');
 const DAY = 86_400_000;
 
 function memory(): Storage & { data: Map<string, string> } {

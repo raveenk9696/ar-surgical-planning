@@ -297,7 +297,7 @@ export function createEngine(o: {
       pendingLinks.set(link, pending + notes.length);
       pendingVerifications += notes.length;
       const epoch = generation;
-      void verifyWire({ v: 2, k: 'snapshot', from, notes }).then((verified) => {
+      void verifyWire({ v: 2, k: 'snapshot', from, notes }, roomId).then((verified) => {
         if (running && epoch === generation) accept(verified, link);
       }).finally(() => {
         pendingVerifications -= notes.length;
@@ -379,12 +379,12 @@ export function createEngine(o: {
       }
       if (!ownNotes.take('self')) return { ok: false, why: 'rate' };
       const id = `${self.id}.${++counter}`;
-      localNote(await signNote({ publicKey: identity.publicKey, signature: '', deletion: null, id, pos: i.pos, nrm: i.nrm, mesh: i.mesh, text, author: self, created: now(), deleted: false }, identity));
+      localNote(await signNote({ publicKey: identity.publicKey, signature: '', deletion: null, id, pos: i.pos, nrm: i.nrm, mesh: i.mesh, text, author: self, created: now(), deleted: false }, identity, roomId));
       return { ok: true, id };
     }); },
     deleteNote(id) { return serialize(async () => {
       const n = state.notes.get(id);
-      if (n && n.author.id === self.id && !n.deleted) localNote({ ...n, deleted: true, deletion: await signDeletion(id, identity) });
+      if (n && n.author.id === self.id && !n.deleted) localNote({ ...n, deleted: true, deletion: await signDeletion(id, identity, roomId) });
     }); },
     setPointer(p) {
       if (p === ptr || (p && ptr && p[0] === ptr[0] && p[1] === ptr[1] && p[2] === ptr[2])) return;

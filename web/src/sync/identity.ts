@@ -28,21 +28,21 @@ async function sign(value: string, identity: Identity): Promise<string> {
   return base64url(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, identity.privateKey, encoder.encode(value)));
 }
 
-export async function signNote(n: Note, identity: Identity): Promise<Note> {
-  return { ...n, publicKey: identity.publicKey, signature: await sign(canonicalNote(n), identity) };
+export async function signNote(n: Note, identity: Identity, roomId: string): Promise<Note> {
+  return { ...n, publicKey: identity.publicKey, signature: await sign(JSON.stringify(['asp-note-v2', roomId, canonicalNote(n)]), identity) };
 }
 
-export async function signDeletion(id: string, identity: Identity): Promise<Deletion> {
-  return { id, signature: await sign(JSON.stringify(['del', id]), identity) };
+export async function signDeletion(id: string, identity: Identity, roomId: string): Promise<Deletion> {
+  return { id, signature: await sign(JSON.stringify(['asp-del-v2', roomId, id]), identity) };
 }
 
-export async function verifyNote(n: Note): Promise<boolean> {
+export async function verifyNote(n: Note, roomId: string): Promise<boolean> {
   try {
     const raw = bytesOf(n.publicKey);
     if (await peerIdOf(raw) !== n.author.id || n.id.split('.')[0] !== n.author.id) return false;
     const key = await crypto.subtle.importKey('raw', raw, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
     const verify = (value: string, sig: string): Promise<boolean> => crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, bytesOf(sig), encoder.encode(value));
-    if (!await verify(canonicalNote(n), n.signature)) return false;
-    return !n.deleted || !!n.deletion && n.deletion.id === n.id && await verify(JSON.stringify(['del', n.id]), n.deletion.signature);
+    if (!await verify(JSON.stringify(['asp-note-v2', roomId, canonicalNote(n)]), n.signature)) return false;
+    return !n.deleted || !!n.deletion && n.deletion.id === n.id && await verify(JSON.stringify(['asp-del-v2', roomId, n.id]), n.deletion.signature);
   } catch { return false; }
 }

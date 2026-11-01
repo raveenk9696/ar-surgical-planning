@@ -133,12 +133,12 @@ export function isNewerVersion(raw: unknown): boolean {
   return isObj(raw) && typeof raw.v === 'number' && raw.v > 2 && typeof raw.k === 'string';
 }
 
-export async function verifyWire(w: Wire): Promise<Wire> {
+export async function verifyWire(w: Wire, roomId: string): Promise<Wire> {
   if (w.k === 'snapshot') {
     const notes: Note[] = [];
-    for (const n of w.notes) if (await verifyNote(n)) notes.push(n);
+    for (const n of w.notes) if (await verifyNote(n, roomId)) notes.push(n);
     return { ...w, notes };
   }
-  if (w.k === 'note' && !await verifyNote(w.note)) return { v: 2, k: 'snapshot', from: w.from, notes: [] };
+  if (w.k === 'note' && !await verifyNote(w.note, roomId)) return { v: 2, k: 'snapshot', from: w.from, notes: [] };
   return w;
 }

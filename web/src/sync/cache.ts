@@ -17,7 +17,7 @@ export async function loadCache(roomId: string, s: Pick<Storage, 'getItem'>, now
     if (now - savedAt > LIMITS.cacheTtlMs || savedAt > now + LIMITS.cacheTtlMs) return [];
     const wire = decode({ v: 2, k: 'snapshot', from: LOCAL, notes }, now);
     if (!wire) return [];
-    const verified = await verifyWire(wire);
+    const verified = await verifyWire(wire, roomId);
     return verified.k === 'snapshot' ? verified.notes : [];
   } catch {
     return [];

@@ -68,7 +68,7 @@ export async function applyHero(mode: HeroMode, h: { viewer: Viewer; engine: Eng
     away: false,
     digest: { n: 1, h: 0 },
   });
-  transport.inject({ v: 2, k: 'note', from: GUEST.id, note: await signNote(noteAt(`${GUEST.id}.1`, 'look here', pin, GUEST), guest) });
+  transport.inject({ v: 2, k: 'note', from: GUEST.id, note: await signNote(noteAt(`${GUEST.id}.1`, 'look here', pin, GUEST), guest, engine.state.roomId) });
   // The pointer fades after 3 s without movement, so it nudges a hair every second to stay on screen for the capture.
   let flip = 1;
   transport.inject(presence(0));
