@@ -1,4 +1,4 @@
-import { verifyNote } from './identity';
+import { verifyNote, presenceIsTimely } from './identity';
 import { LIMITS } from '../config';
 import type { Digest, Mesh, Note, Peer, Vec3, Wire } from '../types';
 
@@ -96,6 +96,7 @@ export function decode(raw: unknown, now = Date.now()): Wire | null {
     }
     case 'presence': {
       const keys = ['v', 'k', 'from', 'seq', 'ptr', 'away', 'digest'];
+      if ('sentAt' in raw) keys.push('sentAt');
       if (!exact(raw, 'proof' in raw ? [...keys, 'proof'] : keys)) return null;
       let proof;
       if ('proof' in raw) {
@@ -112,7 +113,13 @@ export function decode(raw: unknown, now = Date.now()): Wire | null {
       if (!from || !d || (raw.ptr !== null && !ptr)) return null;
       if (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0) return null;
       if (typeof raw.away !== 'boolean') return null;
-      return { v: 2, k: 'presence', from, seq, ptr, away: raw.away, digest: d, ...(proof ? { proof } : {}) };
+      const message: Extract<Wire, { k: 'presence' }> = { v: 2, k: 'presence', from, seq, ptr, away: raw.away, digest: d, ...(proof ? { proof } : {}) };
+      if ('sentAt' in raw) {
+        if (typeof raw.sentAt !== 'number') return null;
+        message.sentAt = raw.sentAt;
+      }
+      if ((proof || 'sentAt' in raw) && !presenceIsTimely(message, now)) return null;
+      return message;
     }
     case 'note': {
       if (!exact(raw, ['v', 'k', 'from', 'note'])) return null;

@@ -563,7 +563,7 @@ it.each(['\u200B', '\u202E', '\u2066', '\u2028', '\u2029', '\u0000'])('rejects l
 
 it('converges three replicas after concurrent adds at 99 notes with loss, duplicates and reorder', async () => {
   const seed: Note[] = [];
-  for (const c of 'DEFGH') for (let i = 1; i <= 20; i++) seed.push(noteBy(c, i));
+  for (const c of 'DEFGH') for (let i = 1; i <= 20; i++) seed.push(noteBy(c, i, { created: Date.now() - 1000 }));
   seed.pop();
   const storage: Storage = { getItem: () => JSON.stringify({ savedAt: Date.now(), notes: seed }), setItem: vi.fn(), removeItem: vi.fn(), clear: vi.fn(), key: () => null, length: 1 };
   const hub = new FakeHub();

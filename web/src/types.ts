@@ -30,14 +30,14 @@ export interface Tombstone extends NoteRecord {
   text?: never;
 }
 export type Note = LiveNote | Tombstone;
-export interface Presence { peer: Peer; seq: number; ptr: Vec3 | null; away: boolean; /** local ms, never sent */ seenAt: number }
+export interface Presence { peer: Peer; seq: number; sentAt?: number; ptr: Vec3 | null; away: boolean; /** local ms, never sent */ seenAt: number }
 /** Record count and content digest. */
 export interface Digest { n: number; h: number }
 export type Wire =
   | { v: 2; k: 'hello'; from: Peer; digest: Digest }
   | { v: 2; k: 'snapshot'; from: PeerId; notes: Note[] }
   | { v: 2; k: 'note'; from: PeerId; note: Note }
-  | { v: 2; k: 'presence'; from: Peer; seq: number; ptr: Vec3 | null; away: boolean; digest: Digest; proof?: PresenceProof }
+  | { v: 2; k: 'presence'; from: Peer; seq: number; sentAt?: number; ptr: Vec3 | null; away: boolean; digest: Digest; proof?: PresenceProof }
   | { v: 2; k: 'bye'; from: PeerId };
 export interface LinkStatus { tabs: 'ok' | 'off' | 'unavailable'; net: 'off' | 'connecting' | 'ok' | 'blocked' | 'down' }
 export interface RoomState {

@@ -8,6 +8,7 @@ export const LIMITS = {
   maxPeers: 8,
   coordMm: 1500,
   presenceHz: 15,
+  presenceMaxAgeMs: 30_000,
   heartbeatMs: 2000,
   peerTtlMs: 8000,
   noteBucket: { burst: 5, refillMs: 1000 },

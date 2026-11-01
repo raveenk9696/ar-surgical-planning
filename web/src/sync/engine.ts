@@ -1,7 +1,7 @@
 import { LIMITS } from '../config';
 import type { Link, Transport } from '../net/transport';
 import type { AddResult, Digest, Mesh, Note, NoteId, Peer, PeerId, Presence, RoomState, Vec3, Wire } from '../types';
-import { canonicalNote, canonicalContent, eraseContent, signPresence, verifyPresence, signNote, signDeletion, type Identity } from './identity';
+import { canonicalNote, canonicalContent, eraseContent, presenceIsTimely, signPresence, verifyPresence, signNote, signDeletion, type Identity } from './identity';
 import { loadCache, saveCache } from './cache';
 import { createLimiter } from './limiter';
 import { digestOf, mergeNote } from './notes';
@@ -81,6 +81,12 @@ function snapshot(s: RoomState): Wire {
   return { v: 2, k: 'snapshot', from: s.self.id, notes: Array.from(s.notes.values()) };
 }
 
+function newerPresence(message: Extract<Wire, { k: 'presence' }>, previous: Presence): boolean {
+  const time = message.sentAt ?? 0;
+  const previousTime = previous.sentAt ?? 0;
+  return time > previousTime || time === previousTime && message.seq > previous.seq;
+}
+
 /** Applies one inbound message. Pure: rate limits and echo checks belong to the caller. */
 export function reduce(s: RoomState, msg: Wire, now: number): { state: RoomState; out: Wire[] } {
   switch (msg.k) {
@@ -95,10 +101,11 @@ export function reduce(s: RoomState, msg: Wire, now: number): { state: RoomState
       const out: Wire[] = [];
       if (!known) out.push(hello(s));
       if (!sameDigest(msg.digest, digestOfMap(s.notes))) out.push(snapshot(s));
-      const fresh = msg.k === 'presence' && (!known || msg.seq > known.seq);
+      const fresh = msg.k === 'presence' && (!known || newerPresence(msg, known));
       const next: Presence = {
         peer: msg.from,
         seq: fresh ? msg.seq : (known?.seq ?? 0),
+        sentAt: fresh ? msg.sentAt : known?.sentAt,
         ptr: fresh ? msg.ptr : (known?.ptr ?? null),
         away: fresh ? msg.away : (known?.away ?? false),
         seenAt: now,
@@ -235,7 +242,7 @@ export function createEngine(o: {
   function sendPresence(): void {
     lastPresenceAt = now();
     ptrDirty = false;
-    send({ v: 2, k: 'presence', from: self, seq: ++seq, ptr: away ? null : ptr, away, digest: digestOfMap(state.notes) });
+    send({ v: 2, k: 'presence', from: self, seq: ++seq, sentAt: now(), ptr: away ? null : ptr, away, digest: digestOfMap(state.notes) });
   }
 
   function flushCache(): void {
@@ -261,12 +268,13 @@ export function createEngine(o: {
     const from = senderOf(msg);
     const bound = identities.get(from);
     if (link !== 'tab' && linkPeers.has(link) && linkPeers.get(link) !== from) return false;
-    const seq = msg.k === 'presence' ? msg.seq : 0;
-    const previousSeq = state.peers.get(from)?.seq ?? -1;
+    const previous = state.peers.get(from);
+    const newer = msg.k === 'presence' && (!previous || newerPresence(msg, previous));
+    if (authenticated && bound?.authenticated && !newer) return false;
     if (bound?.authenticated && !authenticated && msg.k !== 'bye') return false;
     if (bound && (bound.link !== link || authenticated && !bound.authenticated)) {
       if (bound.authenticated && !authenticated) return false;
-      const provedNewer = authenticated && (!bound.authenticated || seq > previousSeq);
+      const provedNewer = authenticated && (!bound.authenticated || newer);
       if (!provedNewer && now() - bound.seenAt < 2 * LIMITS.heartbeatMs) return false;
       unbind(from);
       if (state.peers.has(from)) {
@@ -274,7 +282,7 @@ export function createEngine(o: {
         peers.delete(from);
         commit({ ...state, peers });
       }
-    } else if (authenticated && bound?.authenticated && seq <= previousSeq) return false;
+    }
     identities.set(from, { link, seenAt: now(), authenticated: authenticated || !!bound?.authenticated });
     if (link !== 'tab') linkPeers.set(link, from);
     return true;
@@ -298,8 +306,8 @@ export function createEngine(o: {
       if (pendingPresence.has(link)) return;
       pendingPresence.add(link);
       const epoch = generation;
-      void verifyPresence(msg, roomId).then((valid) => {
-        if (valid && running && epoch === generation && bindPresence(msg, link, true)) accept(msg);
+      void verifyPresence(msg, roomId, now()).then((valid) => {
+        if (valid && running && epoch === generation && presenceIsTimely(msg, now()) && bindPresence(msg, link, true)) accept(msg);
       }).finally(() => pendingPresence.delete(link));
       return;
     }

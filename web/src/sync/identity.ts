@@ -1,3 +1,4 @@
+import { LIMITS } from '../config';
 import type { Peer, Note, LiveNote, Tombstone, Deletion, Wire } from '../types';
 
 export interface Identity { peer: Peer; publicKey: string; privateKey: CryptoKey }
@@ -58,18 +59,25 @@ export async function verifyNote(n: Note, roomId: string): Promise<boolean> {
 
 type PresenceMessage = Extract<Wire, { k: 'presence' }>;
 const canonicalPresence = (m: PresenceMessage, roomId: string): string =>
-  JSON.stringify(['asp-presence-v2', roomId, m.from.id, m.from.name, m.seq, m.ptr, m.away, m.digest.n, m.digest.h]);
+  JSON.stringify(['asp-presence-v2', roomId, m.from.id, m.from.name, m.sentAt, m.seq, m.ptr, m.away, m.digest.n, m.digest.h]);
 
 export async function signPresence(message: PresenceMessage, identity: Identity, roomId: string): Promise<PresenceMessage> {
-  return { ...message, proof: { publicKey: identity.publicKey, signature: await sign(canonicalPresence(message, roomId), identity) } };
+  const timed = { ...message, sentAt: message.sentAt ?? Date.now() };
+  return { ...timed, proof: { publicKey: identity.publicKey, signature: await sign(canonicalPresence(timed, roomId), identity) } };
 }
 
-export async function verifyPresence(message: PresenceMessage, roomId: string): Promise<boolean> {
+export async function verifyPresence(message: PresenceMessage, roomId: string, now = Date.now()): Promise<boolean> {
   try {
-    if (!message.proof) return false;
+    if (!message.proof || !presenceIsTimely(message, now)) return false;
     const raw = bytesOf(message.proof.publicKey);
     if (await peerIdOf(raw) !== message.from.id) return false;
     const key = await crypto.subtle.importKey('raw', raw, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
     return await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, bytesOf(message.proof.signature), encoder.encode(canonicalPresence(message, roomId)));
   } catch { return false; }
+}
+
+export function presenceIsTimely(message: PresenceMessage, now: number): boolean {
+  const sentAt = message.sentAt;
+  return typeof sentAt === 'number' && Number.isSafeInteger(sentAt)
+    && sentAt >= now - LIMITS.presenceMaxAgeMs && sentAt <= now + LIMITS.maxClockSkewMs;
 }

@@ -216,3 +216,57 @@ it('does not reuse note ids after a reload without a cache, even at the same tim
   expect(reloaded.engine.state.notes.get(added.id)?.text).toBe('new');
   reloaded.engine.stop();
 });
+
+it('G5 rejects captured signed presence more than 30 seconds after bye', async () => {
+  const { signPresence } = await import('./identity');
+  const { engine, end } = setup();
+  await engine.start();
+  const captured = await signPresence({ ...presence('V', 3000), v: 2, k: 'presence' }, identity('V'), 'ABCDEFGHIJ');
+  end.inject(captured, 'nostr:v');
+  await settle();
+  end.inject({ v: 2, k: 'bye', from: peer('V').id }, 'nostr:v');
+  vi.advanceTimersByTime(31000);
+  end.inject(captured, 'nostr:replay');
+  await settle();
+  expect(engine.state.peers.has(peer('V').id)).toBe(false);
+  engine.stop();
+});
+
+it('G6 lets a newer signed presence after reload supersede captured high sequences', async () => {
+  const { signPresence } = await import('./identity');
+  const { engine, end } = setup();
+  await engine.start();
+  const captured = await signPresence({ ...presence('V', 3000), v: 2, k: 'presence', ptr: [1, 1, 1] }, identity('V'), 'ABCDEFGHIJ');
+  end.inject(captured, 'nostr:old');
+  await settle();
+  vi.advanceTimersByTime(1000);
+  const fresh = await signPresence({ ...presence('V', 1), v: 2, k: 'presence', ptr: [50, 50, 50] }, identity('V'), 'ABCDEFGHIJ');
+  end.inject(fresh, 'nostr:reloaded');
+  await settle();
+  expect(engine.state.peers.get(peer('V').id)?.ptr).toEqual([50, 50, 50]);
+  vi.advanceTimersByTime(5000);
+  end.inject(captured, 'nostr:attacker');
+  await settle();
+  expect(engine.state.peers.get(peer('V').id)?.ptr).toEqual([50, 50, 50]);
+  engine.stop();
+});
+
+it('rejects future, missing and tampered presence send times', async () => {
+  const { signPresence } = await import('./identity');
+  const { engine, end } = setup();
+  await engine.start();
+  const message = { ...presence('V'), v: 2 as const, k: 'presence' as const, sentAt: Date.now() + 120001 };
+  end.inject(await signPresence(message, identity('V'), 'ABCDEFGHIJ'), 'nostr:v');
+  await settle();
+  expect(engine.state.peers.size).toBe(0);
+  const signed = await signPresence({ ...message, sentAt: Date.now() }, identity('V'), 'ABCDEFGHIJ');
+  const { sentAt: _time, ...untimed } = signed;
+  end.inject(untimed, 'nostr:v');
+  end.inject({ ...signed, sentAt: Date.now() + 1 }, 'nostr:v');
+  await settle();
+  expect(engine.state.peers.size).toBe(0);
+  end.inject(signed, 'nostr:v');
+  await settle();
+  expect(engine.state.peers.size).toBe(1);
+  engine.stop();
+});
