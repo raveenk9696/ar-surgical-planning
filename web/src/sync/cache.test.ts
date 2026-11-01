@@ -42,3 +42,23 @@ describe('cache', async () => {
     expect(await loadCache('ROOM', s, 0)).toEqual([]);
   });
 });
+
+it('removes expired caches for every room on boot and preserves current and unrelated data', async () => {
+  const { createEngine } = await import('./engine');
+  const { FakeHub } = await import('../test/fakehub');
+  const { identity } = await import('../test/signed');
+  const s = memory();
+  Object.defineProperty(s, 'length', { get: () => s.data.size });
+  s.key = (i) => [...s.data.keys()][i] ?? null;
+  s.removeItem = (key) => { s.data.delete(key); };
+  const now = Date.now();
+  saveCache('OLD', [note], s, now - DAY - 1);
+  saveCache('OTHER', [note], s, now - 3 * DAY);
+  s.data.set('asp:v1:LEGACY', JSON.stringify({ savedAt: now - 3 * DAY, notes: [] }));
+  saveCache('RECENT', [], s, now);
+  s.data.set('unrelated', 'leave me');
+  const engine = createEngine({ token: 'ABCDEFGHIJKLMNOPQRST', identity: identity('A'), transport: new FakeHub().end('A'), now: () => now, storage: s });
+  await engine.start();
+  expect([...s.data.keys()].sort()).toEqual(['asp:v2:RECENT', 'unrelated']);
+  engine.stop();
+});

@@ -2,7 +2,7 @@ import { LIMITS } from '../config';
 import type { Link, Transport } from '../net/transport';
 import type { AddResult, Digest, Mesh, Note, NoteId, Peer, PeerId, Presence, RoomState, Vec3, Wire } from '../types';
 import { canonicalNote, canonicalContent, eraseContent, presenceIsTimely, signPresence, verifyPresence, signNote, signDeletion, type Identity } from './identity';
-import { loadCache, saveCache } from './cache';
+import { loadCache, saveCache, sweepExpiredCaches } from './cache';
 import { createLimiter } from './limiter';
 import { digestOf, mergeNote } from './notes';
 import { split } from './roomId';
@@ -438,6 +438,7 @@ export function createEngine(o: {
       running = true;
       const epoch = ++generation;
       if (o.storage) {
+        sweepExpiredCaches(o.storage, now());
         const cached = await loadCache(roomId, o.storage, now());
         if (!running || epoch !== generation) return;
         commit({ ...state, notes: mergeNotes(state.notes, cached, self.id) });
