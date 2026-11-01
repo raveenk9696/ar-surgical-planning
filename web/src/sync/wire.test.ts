@@ -106,3 +106,14 @@ it.each(['\uD800', '\uDC00', '\uE000', '\u{F0000}', '\u0378', '\uFDD0', '\uFFFF'
 it.each(['   ', '\u0301\u0301'])('rejects notes without a visible character %j', (text) => {
   expect(decode(withNote({ text }))).toBeNull();
 });
+
+it('rejects every remaining default-ignorable selector and excessive combining marks', () => {
+  for (const cp of [0x180b, 0x180c, 0x180d, 0x180f, ...Array.from({ length: 240 }, (_, i) => 0xe0100 + i)]) {
+    expect(decode(withNote({ text: `a${String.fromCodePoint(cp)}b` })), cp.toString(16)).toBeNull();
+  }
+  for (const mark of ['\u0489', '\u20dd']) {
+    expect(decode(withNote({ text: 'a' + mark.repeat(3) }))).toBeNull();
+    expect(decode(withNote({ text: 'a' + mark.repeat(2) }))).not.toBeNull();
+  }
+  expect(decode(withNote({ text: 'ok 12 אבג 34' }))).not.toBeNull();
+});

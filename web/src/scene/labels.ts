@@ -29,6 +29,7 @@ function canvas(w: number, h: number): { c: HTMLCanvasElement; ctx: CanvasRender
   const ctx = c.getContext('2d');
   if (!ctx) throw new Error('2D canvas is not available');
   ctx.scale(SCALE, SCALE);
+  ctx.direction = 'ltr';
   return { c, ctx };
 }
 
@@ -74,9 +75,9 @@ export function drawNoteLabel(text: string): CanvasTexture {
     const y = PAD + (i + 1) * LINE_PX - 8;
     ctx.lineWidth = HALO_PX;
     ctx.strokeStyle = 'rgba(255,255,255,0.92)';
-    ctx.strokeText(line, x, y);
+    ctx.strokeText(`\u2068${line}\u2069`, x, y);
     ctx.fillStyle = NOTE_RED;
-    ctx.fillText(line, x, y);
+    ctx.fillText(`\u2068${line}\u2069`, x, y);
   });
   const rad = (40 * Math.PI) / 180;
   const from = { x: 2, y: size.h - 2 };
@@ -143,7 +144,7 @@ export function drawPill(name: string, colour: string): CanvasTexture {
   ctx.font = `600 14px ${UI}`;
   ctx.fillStyle = '#ffffff';
   ctx.textBaseline = 'middle';
-  ctx.fillText(name, 10, size.h / 2 + 0.5);
+  ctx.fillText(`\u2068${name}\u2069`, 10, size.h / 2 + 0.5);
   return texture(c, size);
 }
 

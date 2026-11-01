@@ -9,7 +9,7 @@ const NOTE_ID = /^[A-Z2-7]{26}\.\d{1,9}$/;
 const FORBIDDEN_KEYS = ['__proto__', 'constructor', 'prototype'];
 const NAME_MAX = 16;
 export function isSafeText(value: string): boolean {
-  return !/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\u2028\u2029\uFDD0-\uFDEF\uFFFE\uFFFF\uFFFC\u115F\u1160\u034F\u17B4\u17B5\u2800\u3164\uFFA0\u1680\uFE00-\uFE0F]/u.test(value) && /[^\s\p{M}]/u.test(value.trim()) && value === value.normalize('NFKC');
+  return !/[\p{Default_Ignorable_Code_Point}\p{Bidi_Control}\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\u2028\u2029\uFDD0-\uFDEF\uFFFE\uFFFF\uFFFC\u115F\u1160\u034F\u17B4\u17B5\u2800\u3164\uFFA0\u1680\uFE00-\uFE0F]/u.test(value) && !/\p{M}{3}/u.test(value.normalize('NFD')) && /[^\s\p{M}]/u.test(value.trim()) && value === value.normalize('NFKC');
 }
 
 function isObj(x: unknown): x is Obj {
