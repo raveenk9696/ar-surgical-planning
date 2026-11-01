@@ -188,6 +188,8 @@ export function createStage(canvas: HTMLCanvasElement, o: { lite: boolean }): St
     const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
     cam.matrixWorld.decompose(view.camPos, view.camQuat, new Vector3());
     view.viewH = size().h;
+    view.viewW = size().w;
+    view.camera = cam;
     view.tanFov2 = 2 * Math.tan(MathUtils.degToRad(camera.fov) / 2);
     view.xr = renderer.xr.isPresenting;
     const q = new Quaternion();

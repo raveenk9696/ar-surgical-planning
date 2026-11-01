@@ -1,7 +1,7 @@
 import { Camera, CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, Vector3, type Object3D } from 'three';
 import type { Note, NoteId, PeerId, Vec3 } from '../types';
 import { lpsDirToRig, lpsToRig } from './coords';
-import { drawNoteLabel, drawPin, noteFontReady, placeFlat, textureSize, type View } from './labels';
+import { drawNoteLabel, drawPin, keepLabelInView, noteFontReady, placeFlat, textureSize, type View } from './labels';
 
 const PIN_PX = 16;
 const PIN_PX_COARSE = 20;
@@ -150,6 +150,7 @@ export function createPins(marks: Object3D, view: { colorOf(id: PeerId): string;
           p.label.material.opacity = p.opacity;
           p.label.position.copy(p.pos);
           placeFlat(p.label, world, size.h * (document.body.classList.contains('hero-model') ? 2.3 : 1) * (hovered === p.id ? 1.06 : 1), size.w / size.h, 0.04, v, v.xr ? 'y' : 'full');
+          if (!v.xr && v.camera) keepLabelInView(p.label, v.camera, v.viewW, v.viewH);
         }
       }
     },

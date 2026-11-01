@@ -1,4 +1,4 @@
-import { CanvasTexture, Quaternion, SRGBColorSpace, Vector3, type Object3D } from 'three';
+import { CanvasTexture, Quaternion, SRGBColorSpace, Vector3, type Camera, type Object3D } from 'three';
 
 /** The one red of the 3D scene: the ink of a note and the ring of its pin. */
 export const NOTE_RED = '#e11d48';
@@ -153,6 +153,8 @@ export interface View {
   camQuat: Quaternion;
   /** canvas height in CSS px */
   viewH: number;
+  viewW: number;
+  camera: Camera | null;
   /** 2 * tan(fov / 2): view height per metre of distance */
   tanFov2: number;
   xr: boolean;
@@ -163,7 +165,7 @@ export interface View {
 }
 
 export function createView(): View {
-  return { camPos: new Vector3(), camQuat: new Quaternion(), viewH: 1, tanFov2: 1, xr: false, parentQuatInv: new Quaternion(), parentYaw: 0, parentScale: 1 };
+  return { camPos: new Vector3(), camQuat: new Quaternion(), viewH: 1, viewW: 1, camera: null, tanFov2: 1, xr: false, parentQuatInv: new Quaternion(), parentYaw: 0, parentScale: 1 };
 }
 
 /**
@@ -179,4 +181,33 @@ export function placeFlat(obj: Object3D, worldPos: Vector3, px: number, aspect: 
   } else {
     obj.rotation.set(0, Math.atan2(v.camPos.x - worldPos.x, v.camPos.z - worldPos.z) - v.parentYaw, 0);
   }
+}
+
+export function keepLabelInView(label: Object3D, camera: Camera, width: number, height: number): void {
+  const margin = 12;
+  const bounds = () => {
+    label.updateWorldMatrix(true, false);
+    const corners = [[0, 0], [0, 1], [1, 0], [1, 1]].map(([x, y]) => {
+      const point = new Vector3(x, y, 0).applyMatrix4(label.matrixWorld).project(camera);
+      return { x: (point.x + 1) * width / 2, y: (1 - point.y) * height / 2 };
+    });
+    return {
+      left: Math.min(...corners.map((p) => p.x)), right: Math.max(...corners.map((p) => p.x)),
+      top: Math.min(...corners.map((p) => p.y)), bottom: Math.max(...corners.map((p) => p.y)),
+    };
+  };
+  let box = bounds();
+  const scale = Math.min(1, (width - 2 * margin) / (box.right - box.left), (height - 2 * margin) / (box.bottom - box.top));
+  if (scale < 1) {
+    label.scale.multiplyScalar(scale);
+    box = bounds();
+  }
+  const dx = Math.max(margin - box.left, Math.min(0, width - margin - box.right));
+  const dy = Math.max(margin - box.top, Math.min(0, height - margin - box.bottom));
+  if (!dx && !dy) return;
+  const origin = label.getWorldPosition(new Vector3()).project(camera);
+  origin.x += 2 * dx / width;
+  origin.y -= 2 * dy / height;
+  origin.unproject(camera);
+  label.position.copy(label.parent ? label.parent.worldToLocal(origin) : origin);
 }
