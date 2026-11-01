@@ -37,3 +37,25 @@ it('uses a fresh identity when IndexedDB fails', async () => {
   const b = await loadIdentity(store);
   expect(a.peer.id).not.toBe(b.peer.id);
 });
+
+it.each(['ecdh', 'wrong pair', 'wrong id', 'null keys', 'missing private key', 'infinite expiry', 'string', 'wrong curve'])('replaces and persists corrupt identity: %s', async (kind) => {
+  let value: StoredIdentity | undefined;
+  const store: IdentityStore = { read: async () => value, write: async (next) => { value = structuredClone(next); } };
+  const original = await loadIdentity(store, 1000);
+  const valid = value!;
+  if (kind === 'ecdh') valid.keys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+  if (kind === 'wrong pair') valid.keys.privateKey = (await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify'])).privateKey;
+  if (kind === 'wrong id') valid.peer.id = 'AAAAAAAAAAAAAAAAAAAAAAAAAA';
+  if (kind === 'null keys') value = { ...valid, keys: null } as unknown as StoredIdentity;
+  if (kind === 'missing private key') value = { ...valid, keys: { publicKey: valid.keys.publicKey } } as StoredIdentity;
+  if (kind === 'infinite expiry') valid.expiresAt = Infinity;
+  if (kind === 'string') value = 'corrupt' as unknown as StoredIdentity;
+  if (kind === 'wrong curve') valid.keys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-384' }, false, ['sign', 'verify']);
+  const repaired = await loadIdentity(store, 2000);
+  expect(repaired.peer.id).not.toBe(original.peer.id);
+  expect(value?.peer).toEqual(repaired.peer);
+  expect((await loadIdentity(store, 3000)).peer).toEqual(repaired.peer);
+  const { signPresence, verifyPresence } = await import('./identity');
+  const signed = await signPresence({ v: 2, k: 'presence', from: repaired.peer, seq: 1, ptr: null, away: false, digest: { n: 0, h: 0 } }, repaired, 'room');
+  expect(await verifyPresence(signed, 'room')).toBe(true);
+});

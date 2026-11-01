@@ -1,6 +1,6 @@
 import { LIMITS } from '../config';
 import type { Peer } from '../types';
-import { base64url, newPeer, type Identity } from './identity';
+import { base64url, newPeer, peerIdOf, type Identity } from './identity';
 
 export interface StoredIdentity {
   peer: Peer;
@@ -13,7 +13,7 @@ export interface IdentityStore {
 }
 
 function browserStore(): IdentityStore {
-  // Separate tabs need separate authors and counters; sessionStorage survives a reload.
+  // sessionStorage keeps ownership across a reload without sharing it with another tab.
   let slot = sessionStorage.getItem('asp:identity-slot');
   const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
   if (!slot || navigation?.type === 'navigate') {
@@ -64,12 +64,34 @@ function browserStore(): IdentityStore {
   };
 }
 
+async function validStoredIdentity(saved: StoredIdentity, now: number): Promise<boolean> {
+  try {
+    if (!(saved.expiresAt > now && saved.expiresAt <= now + LIMITS.cacheTtlMs)) return false;
+    const { privateKey, publicKey } = saved.keys;
+    if (privateKey.type !== 'private' || privateKey.extractable || !privateKey.usages.includes('sign')) return false;
+    if (publicKey.type !== 'public' || !publicKey.usages.includes('verify')) return false;
+    for (const key of [privateKey, publicKey]) {
+      const algorithm = key.algorithm as EcKeyAlgorithm;
+      if (algorithm.name !== 'ECDSA' || algorithm.namedCurve !== 'P-256') return false;
+    }
+    const raw = await crypto.subtle.exportKey('raw', publicKey);
+    if (await peerIdOf(new Uint8Array(raw)) !== saved.peer.id) return false;
+    if (typeof saved.peer.name !== 'string' || !saved.peer.name || saved.peer.name.length > 16) return false;
+    const challenge = new TextEncoder().encode('asp-identity-pair-check-v1');
+    const algorithm = { name: 'ECDSA', hash: 'SHA-256' };
+    const signature = await crypto.subtle.sign(algorithm, privateKey, challenge);
+    return await crypto.subtle.verify(algorithm, publicKey, signature, challenge);
+  } catch {
+    return false;
+  }
+}
+
 export async function loadIdentity(store?: IdentityStore, now = Date.now()): Promise<Identity> {
   try {
     const persistence = store ?? browserStore();
     const saved = await persistence.read();
     let value: StoredIdentity;
-    if (saved && saved.expiresAt > now && saved.expiresAt <= now + LIMITS.cacheTtlMs && !saved.keys.privateKey.extractable) {
+    if (saved && await validStoredIdentity(saved, now)) {
       value = saved;
     } else {
       const identity = await newPeer();
