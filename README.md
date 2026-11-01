@@ -21,7 +21,7 @@ I wrote the 2022 code in this repository, except the parts credited below. In 20
 - `pipeline/` turns a CT DICOM series into a colored point cloud (`main.py`) and into bone and skin surface meshes (`surfaces.py`, added in 2026). `fetch_sample.py` downloads a public sample scan and checks each file's SHA-256.
 - `pipeline-lite/` is a short script that prints the size of a scan's bounding box in millimeters.
 - `web/` is the 2026 web app. It shows the model, lets several people drop notes on it and see each other's pointers, and requests AR on browsers with WebXR immersive AR support.
-- `tools/publish_check.py` rejects known scan and model formats, files over 5 MB, build artifacts, and local user paths in local Git blobs. It also checks commit emails, secrets in history, the root license, and draft markers at HEAD.
+- `tools/publish_check.py` rejects known scan and model formats, files over 5 MB, and build artifacts. It rejects known macOS, Linux, and Windows home path patterns in local Git blobs. It also checks commit emails, secrets in history, the root license, and draft markers at HEAD. The Pages deploy gate uses `--deploy` to skip only the commit-email history check.
 
 The 2018 and 2019 scripts are not in git. The lab's HoloLens client is a separate Unity project by Albert Chen, [albert239825/HololensUnityProject](https://github.com/albert239825/HololensUnityProject).
 
@@ -50,7 +50,9 @@ cd web && npm ci && AR_MODEL_SRC=../abdomen.glb npm run dev
 
 Run the pipeline commands above first. `AR_MODEL_SRC=../abdomen.glb` connects their output to the web app.
 
-To build a local preview from `web/`, run these commands. `npm run build` packs the model first.
+To build a local preview from `web/`, run these commands.
+`npm run build` packs the model from `AR_MODEL_SRC` and repacks it when the source file changes.
+`AR_MODEL_SRC` is required. There is no default path.
 
 ```sh
 AR_MODEL_SRC=../abdomen.glb npm run build
@@ -62,7 +64,7 @@ The GitHub Pages workflow downloads and verifies the public scan at build time. 
 
 ## What changed in 2026
 
-The 2022 code did not run. Five fixes have a failing test commit before the fix commit. The chunk interpolation test and fix share commit `08d2b7d`. The stack-shape test also needed the dependency fix in `82207ed` to pass on Python 3.12.
+The 2022 code did not run on the public sample scans, even with its 2022 dependency versions. Five fixes have a failing test commit before the fix commit. The chunk interpolation test and fix share commit `08d2b7d`. The stack-shape test also needed the dependency fix in `82207ed` to pass on Python 3.12.
 
 I fixed these problems:
 
