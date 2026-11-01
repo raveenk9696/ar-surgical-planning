@@ -85,7 +85,7 @@ async function boot(): Promise<void> {
     const w = roomy
       ? window.open(location.href, 'asp-second', `popup=yes,width=${Math.round(Math.min(720, screen.availWidth / 2))},height=${Math.round(screen.availHeight * 0.9)},left=${Math.round(((screen as Screen & { availLeft?: number }).availLeft ?? 0) + screen.availWidth / 2)}`)
       : window.open(location.href, '_blank');
-    if (!w) void copyLink().then(() => status.toast(MESSAGES.popupBlocked, 6000));
+    if (!w) void copyLink().then((ok) => status.toast(ok ? MESSAGES.popupBlocked : `Copy this link: ${shareUrl(token, location)}`, 6000));
   };
 
   const hud = createHud({

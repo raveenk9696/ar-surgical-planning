@@ -6,7 +6,7 @@ export const MESSAGES = {
   waiting: 'Waiting for the other person. Their page must be open.',
   netDown: 'Internet sharing is down. Two tabs in this browser still sync.',
   blocked: 'Blocked on this network. Try another network. Tabs in this browser still work.',
-  roomFull: 'This room has 100 notes. Delete one to add more.',
+  roomFull: 'This room has 100 notes. Notes expire after 24 hours, and only their authors can delete them.',
   ownFull: 'You have 20 notes. Delete one to add more.',
   rate: 'Slow down. One note per second.',
   newer: 'A newer version is open in another tab. Reload.',
