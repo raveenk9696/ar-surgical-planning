@@ -75,7 +75,7 @@ jobs:
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
           sudo install -m 755 "$RUNNER_TEMP/gitleaks" /usr/local/bin/gitleaks
           gitleaks version
-      - run: python tools/publish_check.py
+      - run: python tools/publish_check.py --deploy
 
   deploy:
     needs: [build, publish-check]

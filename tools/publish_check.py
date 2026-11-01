@@ -4,8 +4,11 @@ It reads every object in the local git store, reachable or not, so a file
 deleted in a later commit still fails. It also checks commit emails, the
 license, and draft markers at HEAD. Run it before the repo goes public, and in CI.
 
-Usage: python tools/publish_check.py [repo]
+Usage: python tools/publish_check.py [--deploy] [repo]
+
+--deploy skips only the commit-email history check.
 """
+import argparse
 import re
 import shutil
 import subprocess
@@ -17,7 +20,7 @@ IMAGE_SUFFIXES = (".dcm", ".ima", ".nii", ".nii.gz", ".nrrd", ".mha", ".mhd", ".
 BANNED_DIRS = ("node_modules/", "__pycache__/")
 DICOM_FIRST_ELEMENTS = (b"\x02\x00\x00\x00", b"\x08\x00\x05\x00", b"\x08\x00\x08\x00", b"\x08\x00\x16\x00", b"\x08\x00\x18\x00")
 OBJ_VERTEX = re.compile(rb"^v -?\d", re.MULTILINE)
-LOCAL_PATH = re.compile(rb"/Users/[A-Za-z]|C:\\\\?Users\\\\?[A-Za-z]")
+LOCAL_PATH = re.compile(rb"/Users/[A-Za-z]|/home/[A-Za-z]|C:\\\\?Users\\\\?[A-Za-z]")
 
 
 def git(repo, *args, check=True):
@@ -94,8 +97,13 @@ def secret_problems(repo):
 
 
 if __name__ == "__main__":
-    repo = sys.argv[1] if len(sys.argv) > 1 else "."
-    found = sorted({*blob_problems(repo), *history_problems(repo), *head_problems(repo), *secret_problems(repo)})
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("repo", nargs="?", default=".")
+    parser.add_argument("--deploy", action="store_true", help="skip only the commit-email history check")
+    args = parser.parse_args()
+    repo = args.repo
+    emails = () if args.deploy else history_problems(repo)
+    found = sorted({*blob_problems(repo), *emails, *head_problems(repo), *secret_problems(repo)})
     for line in found:
         print(f"FAIL {line}")
     print(f"publish check: {len(found)} problem(s)")
