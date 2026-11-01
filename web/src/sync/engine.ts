@@ -1,7 +1,7 @@
 import { LIMITS } from '../config';
 import type { Link, Transport } from '../net/transport';
 import type { AddResult, Digest, Mesh, Note, NoteId, Peer, PeerId, Presence, RoomState, Vec3, Wire } from '../types';
-import { canonicalNote, signNote, signDeletion, type Identity } from './identity';
+import { canonicalNote, canonicalContent, eraseContent, signNote, signDeletion, type Identity } from './identity';
 import { loadCache, saveCache } from './cache';
 import { createLimiter } from './limiter';
 import { digestOf, mergeNote } from './notes';
@@ -278,7 +278,7 @@ export function createEngine(o: {
       const notes: Note[] = [];
       for (const n of msg.k === 'note' ? [msg.note] : msg.notes) {
         const prev = state.notes.get(n.id);
-        if (prev && canonicalNote(prev) === canonicalNote(n) && prev.deleted === n.deleted) continue;
+        if (prev && canonicalNote(prev) === canonicalNote(n) && prev.deleted === n.deleted && (prev.deleted || n.deleted || canonicalContent(prev) === canonicalContent(n))) continue;
         const owner = link === 'tab' ? `tab:${n.author.id}` : link;
         if (noteLinks.get(n.id) !== owner) {
           const count = counts.get(owner) ?? 0;
@@ -384,7 +384,7 @@ export function createEngine(o: {
     }); },
     deleteNote(id) { return serialize(async () => {
       const n = state.notes.get(id);
-      if (n && n.author.id === self.id && !n.deleted) localNote({ ...n, deleted: true, deletion: await signDeletion(id, identity, roomId) });
+      if (n && n.author.id === self.id && !n.deleted) localNote(eraseContent(n, await signDeletion(id, identity, roomId)));
     }); },
     setPointer(p) {
       if (p === ptr || (p && ptr && p[0] === ptr[0] && p[1] === ptr[1] && p[2] === ptr[2])) return;

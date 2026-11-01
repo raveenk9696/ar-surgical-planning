@@ -34,3 +34,26 @@ it('verifies at most 20 unknown records and skips a replayed 300-record snapshot
   expect(verify).not.toHaveBeenCalled();
   engine.stop();
 });
+
+it('erases deleted content from state, cache and outgoing wire records', async () => {
+  const data = new Map<string, string>();
+  const storage = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => void data.set(key, value) } as Storage;
+  const { engine, end } = setup(storage);
+  await engine.start();
+  const added = await engine.addNote({ pos: [12, 34, 56], nrm: [0, 0, 1], mesh: 'bone', text: 'patient MRN 123456' });
+  if (!added.ok) throw new Error('add failed');
+  end.sent.length = 0;
+  await engine.deleteNote(added.id);
+  const dead = engine.state.notes.get(added.id)!;
+  expect(dead).not.toHaveProperty('text');
+  expect(dead).not.toHaveProperty('pos');
+  expect(dead).not.toHaveProperty('nrm');
+  expect(dead).not.toHaveProperty('mesh');
+  engine.stop();
+  expect(JSON.stringify([...data.values()])).not.toContain('patient MRN');
+  expect(JSON.stringify(end.sent)).not.toContain('patient MRN');
+  const reloaded = setup(storage);
+  await reloaded.engine.start();
+  expect(reloaded.engine.state.notes.get(added.id)).toEqual(dead);
+  reloaded.engine.stop();
+});

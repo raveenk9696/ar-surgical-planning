@@ -6,7 +6,7 @@ import type { Hit } from './pick';
 import { pick } from './pick';
 import type { ModelHandle } from './model';
 import type { Viewer } from './viewer';
-import type { Note, Peer, Vec3, Wire } from '../types';
+import type { LiveNote, Peer, Vec3, Wire } from '../types';
 
 export type HeroMode = 'model' | 'together';
 
@@ -37,7 +37,7 @@ export function probeFront(model: ModelHandle, x: number, z: number): Hit | null
   return pick(model, new Raycaster(origin, dir), false);
 }
 
-function noteAt(id: string, text: string, hit: Hit, author: Peer): Note {
+function noteAt(id: string, text: string, hit: Hit, author: Peer): Omit<LiveNote, 'contentHash'> {
   return { publicKey: '', signature: '', deletion: null, id, pos: hit.pos, nrm: hit.nrm, mesh: hit.mesh, text, author, created: Date.now(), deleted: false };
 }
 

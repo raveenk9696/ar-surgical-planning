@@ -2,8 +2,8 @@
 import { createHash, generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { vi } from 'vitest';
-import type { Note, Peer } from '../types';
-import { canonicalNote, type Identity } from '../sync/identity';
+import type { Note, LiveNote, Tombstone, Peer } from '../types';
+import { canonicalNote, canonicalContent, eraseContent, type Identity } from '../sync/identity';
 
 const identities = new Map<string, Identity>();
 const keys = new Map<string, KeyObject>();
@@ -19,14 +19,19 @@ for (const c of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
 }
 export const identity = (c: string): Identity => identities.get(c)!;
 export const peer = (c: string): Peer => identity(c).peer;
-export function noteBy(c: string, n: number, over: Partial<Note> = {}, roomId = 'ABCDEFGHIJ'): Note {
+type NoteOverrides = Partial<Omit<LiveNote, 'deleted'>> & { deleted?: boolean };
+export function noteBy(c: string, n: number, over: NoteOverrides & { deleted: true }, roomId?: string): Tombstone;
+export function noteBy(c: string, n: number, over?: NoteOverrides & { deleted?: false }, roomId?: string): LiveNote;
+export function noteBy(c: string, n: number, over: NoteOverrides, roomId?: string): Note;
+export function noteBy(c: string, n: number, over: Partial<Omit<LiveNote, 'deleted'>> & { deleted?: boolean } = {}, roomId = 'ABCDEFGHIJ'): Note {
   const who = identity(c);
-  const note: Note = { id: `${who.peer.id}.${n}`, pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'x', author: who.peer, created: Date.now(), deleted: false, deletion: null, publicKey: who.publicKey, signature: '', ...over };
+  const note: LiveNote = { id: `${who.peer.id}.${n}`, pos: [1, 2, 3], nrm: [0, 0, 1], mesh: 'bone', text: 'x', author: who.peer, created: Date.now(), deletion: null, publicKey: who.publicKey, signature: '', contentHash: '', ...over, deleted: false };
   const signed = (s: string): string => sign('sha256', Buffer.from(s), { key: keys.get(c)!, dsaEncoding: 'ieee-p1363' }).toString('base64url');
-  if (note.deleted && !note.text) note.text = 'x';
+  if (!note.text) note.text = 'x';
+  note.contentHash = createHash('sha256').update(canonicalContent(note)).digest('base64url');
   note.signature = signed(JSON.stringify(['asp-note-v2', roomId, canonicalNote(note)]));
-  if (note.deleted) note.deletion = { id: note.id, signature: signed(JSON.stringify(['asp-del-v2', roomId, note.id])) };
-  return note;
+  if (over.deleted) note.deletion = { id: note.id, signature: signed(JSON.stringify(['asp-del-v2', roomId, note.id])) };
+  return over.deleted ? eraseContent(note) : note;
 }
 export const settle = async (): Promise<void> => { await delay(30); };
 export async function run(ms: number): Promise<void> {

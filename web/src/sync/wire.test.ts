@@ -1,16 +1,17 @@
+import { eraseContent } from './identity';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { Note, Wire } from '../types';
 import { decode, isNewerVersion } from './wire';
 
 const peer = { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', name: 'Guest 2' };
-const note: Note = { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA.1', pos: [10, -20, -300], nrm: [0, -1, 0], mesh: 'bone', text: 'left hip', author: peer, created: Date.now(), deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), deletion: null };
+const note: Note = { id: 'AAAAAAAAAAAAAAAAAAAAAAAAAA.1', pos: [10, -20, -300], nrm: [0, -1, 0], mesh: 'bone', text: 'left hip', author: peer, created: Date.now(), deleted: false, publicKey: 'A'.repeat(87), signature: 'A'.repeat(86), contentHash: 'A'.repeat(43), deletion: null };
 const digest = { n: 1, h: 123 };
 const valid: Wire[] = [
   { v: 2, k: 'hello', from: peer, digest },
   { v: 2, k: 'snapshot', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', notes: [note] },
   { v: 2, k: 'note', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', note },
-  { v: 2, k: 'note', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', note: { ...note, deleted: true, deletion: { id: note.id, signature: 'A'.repeat(86) } } },
+  { v: 2, k: 'note', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA', note: eraseContent(note, { id: note.id, signature: 'A'.repeat(86) }) },
   { v: 2, k: 'presence', from: peer, seq: 4, ptr: [1, 2, 3], away: false, digest },
   { v: 2, k: 'presence', from: peer, seq: 0, ptr: null, away: true, digest },
   { v: 2, k: 'bye', from: 'AAAAAAAAAAAAAAAAAAAAAAAAAA' },
@@ -65,7 +66,7 @@ describe('decode', () => {
 
   it('turns -0 into 0 so equal positions compare equal', () => {
     const w = decode(withNote({ pos: [-0, 0, 0] }));
-    expect(w?.k === 'note' && Object.is(w.note.pos[0], 0)).toBe(true);
+    expect(w?.k === 'note' && Object.is(w.note.pos?.[0], 0)).toBe(true);
   });
 
   it('never throws on arbitrary input', () => {

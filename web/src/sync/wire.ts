@@ -58,7 +58,10 @@ function digest(x: unknown): Digest | null {
 }
 
 function note(x: unknown, now: number): Note | null {
-  if (!exact(x, ['id', 'pos', 'nrm', 'mesh', 'text', 'author', 'created', 'deleted', 'publicKey', 'signature', 'deletion'])) return null;
+  if (!isObj(x)) return null;
+  const keys = ['id', 'author', 'created', 'deleted', 'publicKey', 'signature', 'deletion', 'contentHash'];
+  if (!exact(x, x.deleted === true ? keys : [...keys, 'pos', 'nrm', 'mesh', 'text'])) return null;
+  if (typeof x.contentHash !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(x.contentHash)) return null;
   const id = typeof x.id === 'string' && NOTE_ID.test(x.id) ? x.id : null;
   const pos = vec3(x.pos, LIMITS.coordMm);
   const nrm = vec3(x.nrm, 1.0001);
@@ -66,7 +69,7 @@ function note(x: unknown, now: number): Note | null {
   const author = peer(x.author);
   const created = typeof x.created === 'number' && Number.isFinite(x.created) && x.created >= now - LIMITS.maxNoteAgeMs && x.created <= now + LIMITS.maxClockSkewMs ? x.created : null;
   const deleted = typeof x.deleted === 'boolean' ? x.deleted : null;
-  if (!id || !pos || !nrm || !mesh || !author || created === null || deleted === null) return null;
+  if (!id || !author || created === null || deleted === null) return null;
   if (id.slice(0, 26) !== author.id) return null;
   const body = text(x.text, 1, LIMITS.textMax);
   if (typeof x.publicKey !== 'string' || !/^[A-Za-z0-9_-]{87}$/.test(x.publicKey)) return null;
@@ -76,8 +79,10 @@ function note(x: unknown, now: number): Note | null {
     if (!exact(x.deletion, ['id', 'signature']) || x.deletion.id !== id || typeof x.deletion.signature !== 'string' || !/^[A-Za-z0-9_-]{86}$/.test(x.deletion.signature)) return null;
     deletion = { id, signature: x.deletion.signature };
   } else if (x.deletion !== null) return null;
-  if (body === null) return null;
-  return { id, pos, nrm, mesh, text: body, author, created, deleted, publicKey: x.publicKey, signature: x.signature, deletion };
+  const common = { id, author, created, contentHash: x.contentHash, publicKey: x.publicKey, signature: x.signature, deletion };
+  if (deleted) return { ...common, deleted: true };
+  if (body === null || !pos || !nrm || !mesh) return null;
+  return { ...common, pos, nrm, mesh, text: body, deleted: false };
 }
 
 export function decode(raw: unknown, now = Date.now()): Wire | null {

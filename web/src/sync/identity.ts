@@ -1,9 +1,16 @@
-import type { Peer, Note, Deletion } from '../types';
+import type { Peer, Note, LiveNote, Tombstone, Deletion } from '../types';
 
 export interface Identity { peer: Peer; publicKey: string; privateKey: CryptoKey }
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const encoder = new TextEncoder();
-export const canonicalNote = (n: Note): string => JSON.stringify([n.id, n.pos, n.nrm, n.mesh, n.author.id, n.author.name, n.created, n.text]);
+export const canonicalContent = (n: LiveNote): string => JSON.stringify([n.pos, n.nrm, n.mesh, n.author.name, n.text]);
+export const canonicalNote = (n: Note): string => JSON.stringify([n.id, n.author.id, n.created, n.contentHash]);
+export function eraseContent(n: Note, deletion: Deletion | null = n.deletion): Tombstone {
+  return { id: n.id, author: n.author, created: n.created, contentHash: n.contentHash, publicKey: n.publicKey, signature: n.signature, deleted: true, deletion };
+}
+async function contentHash(n: LiveNote): Promise<string> {
+  return base64url(await crypto.subtle.digest('SHA-256', encoder.encode(canonicalContent(n))));
+}
 export const base64url = (bytes: ArrayBuffer): string => btoa(String.fromCharCode(...new Uint8Array(bytes))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 const bytesOf = (s: string): Uint8Array<ArrayBuffer> => Uint8Array.from(atob(s.replaceAll('-', '+').replaceAll('_', '/')), (c) => c.charCodeAt(0));
 
@@ -28,8 +35,9 @@ async function sign(value: string, identity: Identity): Promise<string> {
   return base64url(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, identity.privateKey, encoder.encode(value)));
 }
 
-export async function signNote(n: Note, identity: Identity, roomId: string): Promise<Note> {
-  return { ...n, publicKey: identity.publicKey, signature: await sign(JSON.stringify(['asp-note-v2', roomId, canonicalNote(n)]), identity) };
+export async function signNote(n: Omit<LiveNote, 'contentHash'> & { contentHash?: string }, identity: Identity, roomId: string): Promise<LiveNote> {
+  const hashed: LiveNote = { ...n, contentHash: await contentHash({ ...n, contentHash: '' }) };
+  return { ...hashed, publicKey: identity.publicKey, signature: await sign(JSON.stringify(['asp-note-v2', roomId, canonicalNote(hashed)]), identity) };
 }
 
 export async function signDeletion(id: string, identity: Identity, roomId: string): Promise<Deletion> {
@@ -38,6 +46,7 @@ export async function signDeletion(id: string, identity: Identity, roomId: strin
 
 export async function verifyNote(n: Note, roomId: string): Promise<boolean> {
   try {
+    if (!n.deleted && await contentHash(n) !== n.contentHash) return false;
     const raw = bytesOf(n.publicKey);
     if (await peerIdOf(raw) !== n.author.id || n.id.split('.')[0] !== n.author.id) return false;
     const key = await crypto.subtle.importKey('raw', raw, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);

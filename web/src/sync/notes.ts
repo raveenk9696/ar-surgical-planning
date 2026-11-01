@@ -13,11 +13,12 @@ export function fnv32(s: string): number {
 export function mergeNote(a: Note | undefined, b: Note): { note: Note; changed: boolean } {
   if (!a) return { note: b, changed: true };
   if (a.publicKey !== b.publicKey) return { note: a, changed: false };
+  if (a.deleted || b.deleted) {
+    const tomb = a.deleted && b.deleted ? (canonicalNote(a) <= canonicalNote(b) ? a : b) : a.deleted ? a : b;
+    return { note: tomb, changed: tomb !== a };
+  }
   const winner = canonicalNote(a) <= canonicalNote(b) ? a : b;
-  const deletion = a.deletion && b.deletion ? (a.deletion.signature < b.deletion.signature ? a.deletion : b.deletion) : a.deletion ?? b.deletion;
-  const deleted = a.deleted || b.deleted;
-  if (winner === a && deleted === a.deleted && deletion === a.deletion) return { note: a, changed: false };
-  return { note: { ...winner, deleted, deletion }, changed: true };
+  return { note: winner, changed: winner !== a };
 }
 
 export function digestOf(notes: Iterable<Note>): Digest {

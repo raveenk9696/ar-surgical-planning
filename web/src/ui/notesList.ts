@@ -1,4 +1,4 @@
-import type { Note, NoteId, RoomState } from '../types';
+import type { LiveNote, Note, NoteId, RoomState } from '../types';
 import { byId, h } from './dom';
 import type { Roster } from './people';
 
@@ -25,7 +25,7 @@ export function createNotesView(
   const cards = new Map<NoteId, HTMLElement>();
   let selected: NoteId | null = null;
 
-  function card(n: Note, self: string): HTMLElement {
+  function card(n: LiveNote, self: string): HTMLElement {
     const dot = h('span', { class: 'dot', attrs: { 'data-author': n.author.id } });
     dot.style.setProperty('--dot', roster.colorOf(n.author.id));
     const time = noteTime(n.created);

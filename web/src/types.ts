@@ -5,21 +5,30 @@ export type Vec3 = readonly [x: number, y: number, z: number];
 export type Mesh = 'bone' | 'skin';
 export interface Peer { id: PeerId; name: string }
 export interface Deletion { id: NoteId; signature: string }
-export interface Note {
+interface NoteRecord {
   publicKey: string;
   signature: string;
   deletion: Deletion | null;
   id: NoteId;
+  author: Peer;
+  created: number;
+  contentHash: string;
+}
+export interface LiveNote extends NoteRecord {
+  deleted: false;
   pos: Vec3;
   nrm: Vec3;
   mesh: Mesh;
-  /** Immutable signed content, including after deletion. */
   text: string;
-  author: Peer;
-  /** epoch ms, display only */
-  created: number;
-  deleted: boolean;
 }
+export interface Tombstone extends NoteRecord {
+  deleted: true;
+  pos?: never;
+  nrm?: never;
+  mesh?: never;
+  text?: never;
+}
+export type Note = LiveNote | Tombstone;
 export interface Presence { peer: Peer; seq: number; ptr: Vec3 | null; away: boolean; /** local ms, never sent */ seenAt: number }
 /** Record count and content digest. */
 export interface Digest { n: number; h: number }
