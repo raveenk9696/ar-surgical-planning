@@ -200,10 +200,9 @@ async function boot(): Promise<void> {
       bar.hidden = true;
       if (flags.hero && heroTransport) {
         const mode = flags.hero;
-        void v.stage.firstFrame.then(() => {
-          applyHero(mode, { viewer: v, engine, transport: heroTransport, model });
-          hud.setSkin(v.skinOn());
-        });
+        void v.stage.firstFrame
+          .then(() => applyHero(mode, { viewer: v, engine, transport: heroTransport, model }))
+          .then(() => hud.setSkin(v.skinOn()));
       }
       const ar = setupAr(v.stage, model, engine, {
         viewer: v,
