@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vitest/config';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import { licenses } from './scripts/licenses';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -27,7 +28,7 @@ const csp: Plugin = {
 export default defineConfig(({ command, isPreview }) => ({
   // preview serves the built page, whose URLs carry the Pages base path
   base: command === 'build' || isPreview ? (process.env.PAGES_BASE ?? '/ar-surgical-planning/') : '/',
-  plugins: [csp, ...(process.env.VITE_HTTPS ? [basicSsl()] : [])],
+  plugins: [csp, licenses(), ...(process.env.VITE_HTTPS ? [basicSsl()] : [])],
   build: { target: 'es2022', assetsInlineLimit: 0, chunkSizeWarningLimit: 1000 },
   server: { host: true },
   preview: { host: true },
