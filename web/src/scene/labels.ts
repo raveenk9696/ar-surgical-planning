@@ -61,7 +61,9 @@ function wrap(ctx: CanvasRenderingContext2D, text: string): string[] {
 export function drawNoteLabel(text: string): CanvasTexture {
   const probe = canvas(1, 1).ctx;
   probe.font = `400 ${FONT_PX}px ${SCRIPT}`;
-  const font = !text.includes(' ') && probe.measureText(text).width > WRAP_PX - 2 * PAD ? UI : SCRIPT;
+  // The handwriting font draws 1 as a bare stroke that reads as a slash.
+  const unbroken = !text.includes(' ') && probe.measureText(text).width > WRAP_PX - 2 * PAD;
+  const font = unbroken || /\d/.test(text) ? UI : SCRIPT;
   probe.font = `400 ${FONT_PX}px ${font}`;
   const lines = wrap(probe, text);
   let fontPx = FONT_PX;

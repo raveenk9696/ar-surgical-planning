@@ -62,6 +62,18 @@ it('breaks a 24-character word into two readable lines', () => {
   label.dispose();
 });
 
+it('draws a note with a digit in the UI font, because the handwriting 1 reads as a slash', () => {
+  const fonts: string[] = [];
+  const ctx = new Proxy({ font: '', fillText() { fonts.push(this.font); }, measureText: (text: string) => ({ width: text.length * 8 }) }, {
+    get: (target, key) => Reflect.get(target, key) ?? (() => undefined),
+  });
+  vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => ctx }) });
+  drawNoteLabel('test p1').dispose();
+  drawNoteLabel('Look here').dispose();
+  expect(fonts[0]).toContain('Inter');
+  expect(fonts[1]).toContain('Homemade Apple');
+});
+
 it('connects a shifted label to its pin with a separate leader ending at the nearest edge', async () => {
   const { Group, PerspectiveCamera, Vector3, Line } = await import('three');
   const { createPins } = await import('./pins');
