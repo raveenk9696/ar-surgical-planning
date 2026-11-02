@@ -71,11 +71,10 @@ The GitHub Pages workflow downloads and verifies the public scan at build time. 
 
 ## What changed in 2026
 
-The 2022 code did not run on the public sample scans, even with its 2022 dependency versions. Five fixes have a failing test commit before the fix commit. The chunk interpolation test and fix share commit `08d2b7d`. The stack-shape test also needed the dependency fix in `82207ed` to pass on Python 3.12.
-
-I fixed these problems:
+The 2022 code did not run on the public sample scans, even with its 2022 dependency versions. I fixed the seven problems below. Six have a failing test commit before the fix commit. The chunk interpolation test and fix share commit `08d2b7d`. The stack-shape test also needed the dependency fix in `82207ed` to pass on Python 3.12.
 
 - The PLY step crashed on the shape of the slice stack.
+- Scans without a SliceLocation tag, such as the TCIA sample, crashed on NumPy 2.
 - Slices were sorted by file name, not by position, so the model came out shuffled.
 - Each slice was scaled by its own minimum and maximum, so air stayed in the model on scans padded outside the scan circle, which many scanners do.
 - The brightest bone wrapped to 0 and dropped out.
