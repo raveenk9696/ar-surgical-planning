@@ -20,7 +20,7 @@ export const LIMITS = {
 export const RELAYS: readonly string[] = [
   'wss://cdn.satellite.earth',
   'wss://nos.lol',
-  'wss://0x-nostr-relay.fly.dev',
+  'wss://relay.damus.io',
   'wss://nostr.red5d.dev',
   'wss://bendernostur.duckdns.org:8443',
 ];
