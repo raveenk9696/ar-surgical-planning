@@ -2,7 +2,7 @@
 
 Turn a CT scan into 3D models of bone and skin, then mark them up together in a web browser, with AR on browsers that support WebXR.
 
-**Demo URL after publication:** https://raveenk9696.github.io/ar-surgical-planning/ (open it in a second tab to watch notes and pointers sync)
+**Live demo:** https://raveenk9696.github.io/ar-surgical-planning/ (open it in a second tab to watch notes and pointers sync)
 
 ![Bone inside glass skin, made by this pipeline from a public CT scan](docs/hero-model.png)
 
