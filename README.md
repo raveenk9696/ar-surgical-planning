@@ -6,6 +6,10 @@ Turn a CT scan into 3D models of bone and skin, then mark them up together in a 
 
 ![Bone inside glass skin, made by this pipeline from a public CT scan](docs/hero-model.png)
 
+![Two people on one scan, with the skin off: a second guest's note and pointer](docs/hero-together.png)
+
+*Staged: a second guest's note and pointer.*
+
 ## Why I built it
 
 Surgeons often plan operations from 2D scan slices. In 2018, a 3D model of a CT scan took hours of image work by hand. I wanted a program that makes the model on its own, so a surgeon can look at the patient's anatomy in a headset.
