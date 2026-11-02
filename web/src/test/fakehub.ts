@@ -14,10 +14,11 @@ export interface FakeEnd extends Transport {
 export class FakeHub {
   delayMs: (from: string, to: string) => number = () => 1;
   duplicate = false;
-  dropEvery = 0;
+  /** Drops about one delivery in N at seeded random positions. A fixed period could drop the same message of every heartbeat. */
+  dropOneIn = 0;
   private readonly ends = new Map<string, FakeEnd>();
   private readonly cuts = new Set<string>();
-  private count = 0;
+  private seed = 1;
 
   end(name: string): FakeEnd {
     const message = createSignal<[unknown, Link]>();
@@ -62,11 +63,19 @@ export class FakeHub {
   private deliver(from: string, w: Wire): void {
     for (const [to, end] of this.ends) {
       if (to === from || this.cuts.has(`${from}>${to}`)) continue;
-      if (this.dropEvery && ++this.count % this.dropEvery === 0) continue;
+      if (this.dropOneIn && this.random() * this.dropOneIn < 1) continue;
       const copies = this.duplicate ? 2 : 1;
       for (let i = 0; i < copies; i++) {
         setTimeout(() => end.inject(structuredClone(w), `nostr:${from}`), this.delayMs(from, to) + i);
       }
     }
+  }
+
+  /** mulberry32 */
+  private random(): number {
+    this.seed = (this.seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(this.seed ^ (this.seed >>> 15), 1 | this.seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
 }

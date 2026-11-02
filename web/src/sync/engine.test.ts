@@ -125,7 +125,7 @@ describe('engine on a fake network', () => {
 
   it('survives lossy, reordered delivery', async () => {
     const hub = new FakeHub();
-    hub.dropEvery = 3;
+    hub.dropOneIn = 3;
     hub.delayMs = (from, to) => ((from.charCodeAt(0) * 7 + to.charCodeAt(0)) % 40) + 1;
     const a = mk(hub, 'A');
     const b = mk(hub, 'B');
@@ -579,12 +579,12 @@ it('converges three replicas after concurrent adds at 99 notes with loss, duplic
     expect((await add(engine)).ok).toBe(true);
   }
   hub.duplicate = true;
-  hub.dropEvery = 3;
+  hub.dropOneIn = 3;
   let delivery = 0;
   hub.delayMs = () => (++delivery % 2 ? 90 : 1);
   hub.heal();
   await run(30_000);
-  hub.dropEvery = 0;
+  hub.dropOneIn = 0;
   await run(12_000);
   for (const { engine } of replicas) {
     await settle();
