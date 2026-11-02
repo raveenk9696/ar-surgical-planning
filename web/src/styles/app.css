@@ -49,7 +49,7 @@ h1 { margin: 0; max-width: 15em; font-size: clamp(1.75rem, 1.2rem + 1.6vw, 2.5re
 .btn[aria-disabled='true']:hover { transform: none; }
 
 .controls { display: contents; }
-.actions { position: fixed; z-index: 3; top: 40px; right: var(--gutter); display: flex; align-items: flex-start; gap: 12px; }
+.actions { position: fixed; z-index: 4; top: 40px; right: var(--gutter); display: flex; align-items: flex-start; gap: 12px; }
 .action { position: relative; }
 .action .helper, .action .textbtn { position: absolute; top: 56px; margin: 0; }
 .action .helper { right: 0; white-space: nowrap; font: 400 14px/1.45 var(--font); color: var(--note-ink); }
